@@ -1,1 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HPL Feedback Generator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --dk: #153E35;
+      --teal: #21B592;
+      --teal-h: #1a9e7f;
+      --teal-bg: rgba(33,181,146,0.08);
+      --teal-glow: rgba(33,181,146,0.25);
+      --emp: #C8A951; --emp-bg: #faf4e2;
+      --agi: #8CB857; --agi-bg: #f1f8e8;
+      --hw: #E85B7A;  --hw-bg: #fdedf0;
+      --w: #ffffff; --off: #f7faf9;
+      --g1: #f0f4f3; --g2: #dce5e2; --g3: #b8c7c2; --g4: #8a9e97; --g5: #5f7570;
+      --red: #dc2626;
+      --r: 10px; --rl: 14px;
+      --sh: 0 1px 3px rgba(21,62,53,0.08);
+      --shm: 0 4px 12px rgba(21,62,53,0.1);
+      --t: 0.2s ease;
+      --f: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body { font-family: var(--f); background: var(--off); color: var(--dk); line-height: 1.6; min-height: 100vh; }
+
+    /* ═══ GATE ═══ */
+    .gate { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 24px; }
+    .gate-box {
+      background: var(--w); border: 1px solid var(--g2); border-radius: var(--rl);
+      padding: 44px 38px; max-width: 420px; width: 100%; text-align: center; box-shadow: var(--shm);
+    }
+    .gate-box h1 { font-size: 1.5rem; color: var(--dk); margin-bottom: 2px; }
+    .gate-box h1 span { color: var(--teal); }
+    .gate-box .sub { color: var(--g4); font-size: 0.88rem; margin-bottom: 24px; }
+    .gate-box input {
+      width: 100%; padding: 12px 14px; border: 1.5px solid var(--g2); border-radius: var(--r);
+      font-size: 1rem; font-family: var(--f); text-align: center; margin-bottom: 14px; background: var(--g1);
+    }
+    .gate-box input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-glow); background: var(--w); }
+    .gate-err { color: var(--red); font-size: 0.85rem; margin-top: 8px; display: none; }
+
+    /* ═══ HEADER ═══ */
+    .top-bar { background: var(--dk); padding: 20px 24px; text-align: center; }
+    .top-bar h1 { color: var(--w); font-size: 1.5rem; font-weight: 700; }
+    .top-bar h1 span { color: var(--teal); }
+    .top-bar p { color: var(--g3); font-size: 0.88rem; margin-top: 2px; }
+
+    /* ═══ LAYOUT ═══ */
+    .wrap { max-width: 780px; margin: 0 auto; padding: 24px 16px 64px; }
+
+    /* ═══ CARDS ═══ */
+    .card {
+      background: var(--w); border: 1px solid var(--g2); border-radius: var(--rl);
+      padding: 24px; margin-bottom: 20px; box-shadow: var(--sh);
+    }
+    .ch { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+    .sb {
+      width: 30px; height: 30px; background: var(--teal); color: var(--w); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 700; flex-shrink: 0;
+    }
+    .ch h2 { font-size: 1rem; font-weight: 700; color: var(--dk); }
+
+    /* ═══ FORM ═══ */
+    .fg { margin-bottom: 14px; }
+    .og { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 520px) { .og { grid-template-columns: 1fr; } }
+    label.fl {
+      display: block; font-size: 0.8rem; font-weight: 700; color: var(--g5);
+      text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 5px;
+    }
+    input[type="text"], select, textarea {
+      width: 100%; padding: 10px 13px; border: 1.5px solid var(--g2); border-radius: var(--r);
+      font-size: 0.92rem; font-family: var(--f); color: var(--dk); background: var(--g1);
+      transition: border-color var(--t), box-shadow var(--t);
+    }
+    input[type="text"]:focus, select:focus, textarea:focus {
+      outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-glow); background: var(--w);
+    }
+    textarea#transcript { min-height: 110px; resize: vertical; line-height: 1.65; }
+
+    /* ═══ HPL ═══ */
+    .hsr { display: flex; gap: 8px; align-items: flex-end; }
+    .hsr select { flex: 1; }
+    .htags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .ht {
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+      border-radius: 20px; font-size: 0.82rem; font-weight: 600;
+    }
+    .ht .rx { cursor: pointer; font-size: 1rem; line-height: 1; opacity: 0.6; }
+    .ht .rx:hover { opacity: 1; }
+    .ht[data-c="Empathetic"] { background: var(--emp-bg); color: #8a6d1b; border: 1px solid var(--emp); }
+    .ht[data-c="Agile"]      { background: var(--agi-bg); color: #4a6e1e; border: 1px solid var(--agi); }
+    .ht[data-c="Hard Working"]{ background: var(--hw-bg);  color: #a8213e; border: 1px solid var(--hw); }
+
+    /* ═══ MIC AREA ═══ */
+    .mic-area { display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+    .mic-btn {
+      width: 60px; height: 60px; border-radius: 50%; border: none; background: var(--teal);
+      color: var(--w); cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; box-shadow: var(--shm); transition: background var(--t), transform var(--t);
+    }
+    .mic-btn:hover { background: var(--teal-h); transform: scale(1.05); }
+    .mic-btn.rec { background: var(--red); animation: pulse 1.5s ease-out infinite; }
+    .mic-btn svg { width: 26px; height: 26px; fill: currentColor; }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(220,38,38,0.45); }
+      70%  { box-shadow: 0 0 0 14px rgba(220,38,38,0); }
+      100% { box-shadow: 0 0 0 0 rgba(220,38,38,0); }
+    }
+    .mic-s { font-size: 0.88rem; color: var(--g4); }
+    .mic-s.act { color: var(--red); font-weight: 700; }
+    .timer { font-family: monospace; font-size: 1.1rem; color: var(--red); font-weight: 700; display: none; }
+
+    /* ═══ OR DIVIDER ═══ */
+    .or-divider {
+      display: flex; align-items: center; gap: 14px; margin: 18px 0; color: var(--g4); font-size: 0.82rem;
+    }
+    .or-divider::before, .or-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--g2);
+    }
+
+    /* ═══ BUTTONS ═══ */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px; padding: 10px 20px;
+      border: none; border-radius: var(--r); font-size: 0.9rem; font-weight: 700;
+      font-family: var(--f); cursor: pointer;
+      transition: background var(--t), transform var(--t), opacity var(--t);
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+    .btn-p { background: var(--dk); color: var(--w); }
+    .btn-p:hover:not(:disabled) { background: #1b4f44; }
+    .btn-t { background: var(--teal); color: var(--w); }
+    .btn-t:hover:not(:disabled) { background: var(--teal-h); }
+    .btn-o { background: var(--w); color: var(--dk); border: 1.5px solid var(--g2); }
+    .btn-o:hover:not(:disabled) { background: var(--g1); }
+    .btn-s { padding: 8px 14px; font-size: 0.82rem; }
+    .br { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+
+    /* ═══ OUTPUT ═══ */
+    .oc { border-left: 4px solid var(--teal); }
+    .fo {
+      background: var(--teal-bg); border: 1px solid rgba(33,181,146,0.15); border-radius: var(--r);
+      padding: 18px 20px; font-size: 0.98rem; line-height: 1.75; color: var(--dk);
+      min-height: 60px; white-space: pre-wrap;
+    }
+    .tr { display: flex; gap: 8px; margin-top: 14px; }
+    .tr input { flex: 1; }
+
+    /* ═══ TOAST ═══ */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+      background: var(--dk); color: var(--w); padding: 10px 22px; border-radius: var(--r);
+      font-size: 0.88rem; font-weight: 600; opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease; z-index: 999; pointer-events: none;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+    .spinner {
+      display: inline-block; width: 17px; height: 17px;
+      border: 2.5px solid rgba(255,255,255,0.3); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .err {
+      background: #fef2f2; border: 1px solid #fecaca; color: var(--red);
+      padding: 10px 14px; border-radius: var(--r); font-size: 0.88rem; margin-top: 12px;
+    }
+    .hid { display: none !important; }
+    .foot { text-align: center; font-size: 0.78rem; color: var(--g4); margin-top: 32px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ACCESS GATE                                                           -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div id="gate" class="gate">
+  <div class="gate-box">
+    <h1><span>HPL</span> Feedback Generator</h1>
+    <p class="sub">Enter the staff access code to continue</p>
+    <input type="password" id="codeIn" placeholder="Access code" onkeydown="if(event.key==='Enter')checkCode()" autofocus />
+    <button class="btn btn-p" onclick="checkCode()" style="width:100%">Enter</button>
+    <p id="codeErr" class="gate-err">Incorrect code. Try again.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- MAIN APP                                                               -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div id="app" style="display:none">
+  <div class="top-bar">
+    <h1><span>HPL</span> Feedback Generator</h1>
+    <p>Speak it. Polish it. Copy it. Done.</p>
+  </div>
+  <div class="wrap">
+
+    <!-- STEP 1 -->
+    <div class="card">
+      <div class="ch"><div class="sb">1</div><h2>Setup</h2></div>
+      <div class="og">
+        <div class="fg">
+          <label class="fl" for="sName">Student Name</label>
+          <input type="text" id="sName" placeholder="e.g. Mark" />
+        </div>
+        <div class="fg">
+          <label class="fl" for="tone">Tone</label>
+          <select id="tone">
+            <option value="">Match my voice</option>
+            <option value="warm and encouraging">Warm &amp; Encouraging</option>
+            <option value="professional and direct">Professional &amp; Direct</option>
+            <option value="supportive and growth-focused">Supportive &amp; Growth-Focused</option>
+            <option value="celebratory and enthusiastic">Celebratory &amp; Enthusiastic</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl" for="ctx">Context</label>
+        <input type="text" id="ctx" placeholder="e.g. Year 8 English essay on Macbeth" />
+      </div>
+      <div class="fg">
+        <label class="fl">HPL Skill(s) Demonstrated</label>
+        <div class="hsr">
+          <select id="hdd">
+            <option value="" disabled selected>Select a VAA...</option>
+            <optgroup label="EMPATHETIC">
+              <option value="Collaborative" data-c="Empathetic">Collaborative</option>
+              <option value="Concerned for society" data-c="Empathetic">Concerned for society</option>
+              <option value="Confident" data-c="Empathetic">Confident</option>
+            </optgroup>
+            <optgroup label="AGILE">
+              <option value="Enquiring" data-c="Agile">Enquiring</option>
+              <option value="Creative and enterprising" data-c="Agile">Creative and enterprising</option>
+              <option value="Open-minded" data-c="Agile">Open-minded</option>
+              <option value="Risk-taking" data-c="Agile">Risk-taking</option>
+            </optgroup>
+            <optgroup label="HARD WORKING">
+              <option value="Practice" data-c="Hard Working">Practice</option>
+              <option value="Perseverance" data-c="Hard Working">Perseverance</option>
+              <option value="Resilience" data-c="Hard Working">Resilience</option>
+            </optgroup>
+          </select>
+          <button class="btn btn-t btn-s" onclick="addHpl()">+ Add</button>
+        </div>
+        <div class="htags" id="htags"></div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="card">
+      <div class="ch"><div class="sb">2</div><h2>Record or type your feedback</h2></div>
+
+      <div class="mic-area">
+        <button class="mic-btn" id="micBtn" title="Tap to record">
+          <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-3.07A7 7 0 0 0 19 11h-2z"/></svg>
+        </button>
+        <div>
+          <div class="mic-s" id="micSt">Tap the mic to record your voice</div>
+          <div class="timer" id="timer">00:00</div>
+        </div>
+      </div>
+
+      <div class="or-divider">OR TYPE BELOW</div>
+
+      <textarea id="transcript" placeholder="Type your feedback here..."></textarea>
+
+      <div class="br">
+        <button class="btn btn-p" id="genBtn" onclick="handleGenerate()">Generate Feedback</button>
+        <button class="btn btn-o" onclick="clearAll()">Clear All</button>
+      </div>
+      <div id="genErr" class="err hid"></div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="card oc hid" id="outCard">
+      <div class="ch"><div class="sb">3</div><h2>Polished Feedback</h2></div>
+      <div class="fo" id="fOut"></div>
+      <div class="br">
+        <button class="btn btn-t btn-s" onclick="copyFb()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy
+        </button>
+        <button class="btn btn-o btn-s" onclick="handleRegen()">Regenerate</button>
+      </div>
+      <div class="tr">
+        <input type="text" id="tweakIn" placeholder="e.g. Make it shorter / More formal / Add a growth target" />
+        <button class="btn btn-p btn-s" onclick="handleTweak()">Tweak</button>
+      </div>
+      <div id="reErr" class="err hid"></div>
+    </div>
+
+    <div class="foot">HPL Feedback Generator &middot; Voice-to-polished-comment tool for teachers</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ╔═══════════════════════════════════════════════════════════════════════════╗
+// ║ CONFIGURATION — CHANGE THESE TWO VALUES                                  ║
+// ╚═══════════════════════════════════════════════════════════════════════════╝
+var CONFIG = {
+  API_KEY:     'AIzaSyCIgzfrjLDk-a72Y_rvAHW1bZst7jevlu8',
+  ACCESS_CODE: 'staffroom2026'
+};
+
+var API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=' + CONFIG.API_KEY;
+
+// ═══ STATE ═══
+var hplSkills = [];
+var currentRaw = '';
+var currentFb = '';
+var isRecording = false;
+var mediaRecorder = null;
+var audioChunks = [];
+var audioBase64 = null;
+var audioMime = '';
+var timerInterval = null;
+var seconds = 0;
+
+// ═══ HPL FULL DEFINITIONS ═══
+var HPL = {
+  "Empathetic": {
+    "Collaborative": "The ability to seek out opportunities to receive responses to your work; present your own views and ideas clearly and concisely; listen to the views of others; be willing and able to work in teams; take a variety of roles and be able to evaluate your own ideas and contributions.",
+    "Concerned for society": "The ability to know the contribution you can make to society for the benefit of those less fortunate; demonstrate citizenship and a sense of community ethos and recognise differences as well as similarities between people and peoples.",
+    "Confident": "The ability to develop a belief in your knowledge, understanding and action; recognise when you need to change your beliefs based upon additional information or the arguments of others; deal with new challenges and situations."
+  },
+  "Agile": {
+    "Enquiring": "The ability to be curious; be willing to work alone; be proactive; keen to learn; show enterprise; think independently; challenge assumptions and require evidence for assertions.",
+    "Creative and enterprising": "The ability to be open-minded and flexible in your thought processes; demonstrate a willingness to innovate and invent new and multiple solutions to a problem or situation; show originality; be resourceful.",
+    "Open-minded": "The ability to take an objective view of different ideas and beliefs; become more receptive to other ideas and beliefs based on the arguments of others; change ideas with compelling evidence.",
+    "Risk-taking": "The ability to demonstrate confidence; experiment with novel ideas and effects; speculate willingly; work in unfamiliar contexts; tolerate uncertainty."
+  },
+  "Hard Working": {
+    "Practice": "The ability to train and prepare through repetition of the same processes in order to become more proficient.",
+    "Perseverance": "The ability to keep going and not give up; face obstacles and difficulties but never give up; persist in effort; work diligently and systematically.",
+    "Resilience": "The ability to overcome setbacks; remain confident, focused, flexible and optimistic; help others to move forward in the face of adversity."
+  }
+};
+
+// ═══ SYSTEM PROMPT ═══
+var SYS = 'You are a professional student feedback writing assistant for teachers in a school that uses the High Performance Learning (HPL) framework.\n\n' +
+  'RULES:\n' +
+  '1. PRESERVE THE TEACHER\'S VOICE — keep their tone. Do NOT make it robotic.\n' +
+  '2. KEEP SPECIFIC DETAILS — semicolons, vocabulary, project topics, etc.\n' +
+  '3. KEEP THE STUDENT\'S NAME if mentioned.\n' +
+  '4. CLEAN UP "um", "uh", "like", false starts, repetitions. Fix grammar only where clearly informal.\n' +
+  '5. STRUCTURE: strengths first, areas for growth, then encouragement/next steps.\n' +
+  '6. CONCISE: 2-5 sentences. No filler.\n' +
+  '7. USE SECOND PERSON ("You demonstrated...").\n' +
+  '8. DO NOT INVENT FEEDBACK the teacher didn\'t say.\n' +
+  '9. MATCH the teacher\'s warmth/formality.\n' +
+  '10. Frame improvements constructively but don\'t over-soften.\n\n' +
+  'HPL: When VAAs are provided, weave them NATURALLY into the comment body. Don\'t bolt them on at the end.\n\n' +
+  'OUTPUT: Return ONLY the polished feedback comment. No preamble, no labels, no quotes.';
+
+// ═══ ACCESS GATE ═══
+function checkCode() {
+  var code = document.getElementById('codeIn').value.trim();
+  if (code === CONFIG.ACCESS_CODE) {
+    document.getElementById('gate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+  } else {
+    document.getElementById('codeErr').style.display = 'block';
+    document.getElementById('codeIn').value = '';
+    document.getElementById('codeIn').focus();
+  }
+}
+
+// ═══ HPL TAGS ═══
+function addHpl() {
+  var dd = document.getElementById('hdd');
+  var val = dd.value;
+  if (!val) return;
+  for (var i = 0; i < hplSkills.length; i++) {
+    if (hplSkills[i].name === val) { dd.selectedIndex = 0; return; }
+  }
+  var cat = dd.options[dd.selectedIndex].getAttribute('data-c');
+  hplSkills.push({ name: val, category: cat });
+  renderHpl();
+  dd.selectedIndex = 0;
+}
+function removeHpl(name) {
+  hplSkills = hplSkills.filter(function(s) { return s.name !== name; });
+  renderHpl();
+}
+function renderHpl() {
+  var c = document.getElementById('htags');
+  c.innerHTML = hplSkills.map(function(s) {
+    return '<span class="ht" data-c="' + s.category + '">' + s.name +
+           ' <span class="rx" onclick="removeHpl(\'' + s.name + '\')">&times;</span></span>';
+  }).join('');
+}
+
+// ═══ MICROPHONE RECORDING ═══
+document.getElementById('micBtn').addEventListener('click', function() {
+  if (isRecording) { stopRec(); }
+  else { startRec(); }
+});
+
+function startRec() {
+  navigator.mediaDevices.getUserMedia({ audio: true })
+    .then(function(stream) {
+      audioChunks = [];
+      audioBase64 = null;
+
+      // Try webm first, fall back to wav
+      var mimeOptions = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4', ''];
+      var chosenMime = '';
+      for (var i = 0; i < mimeOptions.length; i++) {
+        if (mimeOptions[i] === '' || MediaRecorder.isTypeSupported(mimeOptions[i])) {
+          chosenMime = mimeOptions[i];
+          break;
+        }
+      }
+
+      var options = chosenMime ? { mimeType: chosenMime } : {};
+      mediaRecorder = new MediaRecorder(stream, options);
+      audioMime = mediaRecorder.mimeType || 'audio/webm';
+
+      mediaRecorder.addEventListener('dataavailable', function(e) {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      });
+
+      mediaRecorder.addEventListener('stop', function() {
+        stream.getTracks().forEach(function(t) { t.stop(); });
+        var blob = new Blob(audioChunks, { type: audioMime });
+        var reader = new FileReader();
+        reader.onloadend = function() {
+          // reader.result is "data:<mime>;base64,XXXX"
+          audioBase64 = reader.result.split(',')[1];
+        };
+        reader.readAsDataURL(blob);
+      });
+
+      mediaRecorder.start(1000); // collect chunks every second
+      isRecording = true;
+      seconds = 0;
+      document.getElementById('micBtn').classList.add('rec');
+      document.getElementById('micSt').textContent = 'Recording... tap to stop';
+      document.getElementById('micSt').classList.add('act');
+      var timerEl = document.getElementById('timer');
+      timerEl.style.display = 'block';
+      timerEl.textContent = '00:00';
+      timerInterval = setInterval(function() {
+        seconds++;
+        var m = Math.floor(seconds / 60);
+        var s = seconds % 60;
+        timerEl.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+      }, 1000);
+    })
+    .catch(function(err) {
+      alert('Microphone access was denied.\n\nPlease click the lock icon in your browser\'s address bar and allow microphone access, then try again.');
+    });
+}
+
+function stopRec() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+  isRecording = false;
+  clearInterval(timerInterval);
+  document.getElementById('micBtn').classList.remove('rec');
+  document.getElementById('micSt').textContent = 'Recording saved! Click Generate.';
+  document.getElementById('micSt').classList.remove('act');
+  document.getElementById('timer').style.display = 'none';
+}
+
+// ═══ BUILD OPTIONS ═══
+function getOptions() {
+  return {
+    studentName: document.getElementById('sName').value,
+    tone: document.getElementById('tone').value,
+    context: document.getElementById('ctx').value,
+    hplSkills: hplSkills.map(function(s) { return s.name; })
+  };
+}
+
+function buildHplPromptText(options) {
+  var t = '';
+  if (options.studentName) t += 'Student name: ' + options.studentName + '\n';
+  if (options.context) t += 'Context: ' + options.context + '\n';
+  if (options.tone) t += 'Preferred tone: ' + options.tone + '\n';
+  if (options.hplSkills && options.hplSkills.length > 0) {
+    t += 'HPL VAAs to integrate:\n';
+    options.hplSkills.forEach(function(skill) {
+      for (var cat in HPL) {
+        if (HPL[cat][skill]) t += '- ' + skill + ' (' + cat + '): ' + HPL[cat][skill] + '\n';
+      }
+    });
+  }
+  return t;
+}
+
+// ═══ GENERATE ═══
+function handleGenerate() {
+  var transcript = document.getElementById('transcript').value.trim();
+  var hasAudio = audioBase64 && audioBase64.length > 0;
+  var hasText = transcript.length > 0;
+
+  if (!hasAudio && !hasText) {
+    showErr('genErr', 'Please record your voice or type feedback first.');
+    return;
+  }
+  hideErr('genErr');
+
+  var btn = document.getElementById('genBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generating...';
+
+  var options = getOptions();
+  var optText = buildHplPromptText(options);
+
+  var parts = [];
+  var promptIntro;
+
+  if (hasAudio) {
+    // Send audio directly to Gemini for transcription + polishing
+    parts.push({
+      inlineData: {
+        mimeType: audioMime.split(';')[0],  // e.g. "audio/webm"
+        data: audioBase64
+      }
+    });
+    promptIntro = 'The audio above is a teacher speaking feedback about a student. ' +
+      'Listen to what the teacher says, then produce a polished student feedback comment.\n\n';
+    currentRaw = '(audio recording)';
+  } else {
+    promptIntro = 'Raw spoken feedback from the teacher:\n"' + transcript + '"\n\n';
+    currentRaw = transcript;
+  }
+
+  // If they recorded audio BUT also typed text, include text as additional context
+  if (hasAudio && hasText) {
+    promptIntro += 'The teacher also typed these notes: "' + transcript + '"\n\n';
+    currentRaw = transcript;
+  }
+
+  parts.push({
+    text: SYS + '\n\n---\n\n' + optText + promptIntro + 'Return ONLY the polished feedback comment.'
+  });
+
+  var payload = {
+    contents: [{ role: 'user', parts: parts }],
+    generationConfig: { temperature: 0.7, maxOutputTokens: 1024 }
+  };
+
+  callAPI(payload, function(result) {
+    btn.disabled = false;
+    btn.textContent = 'Generate Feedback';
+    if (result.success) {
+      currentFb = result.feedback;
+      document.getElementById('fOut').textContent = result.feedback;
+      document.getElementById('outCard').classList.remove('hid');
+      document.getElementById('outCard').scrollIntoView({ behavior: 'smooth' });
+    } else {
+      showErr('genErr', result.error);
+    }
+  });
+}
+
+// ═══ REGENERATE / TWEAK ═══
+function handleRegen() { regen(''); }
+function handleTweak() {
+  var instr = document.getElementById('tweakIn').value.trim();
+  if (!instr) { showErr('reErr', 'Type a tweak instruction.'); return; }
+  regen(instr);
+}
+function regen(instr) {
+  hideErr('reErr');
+  var out = document.getElementById('fOut');
+  out.style.opacity = '0.5';
+
+  var options = getOptions();
+  var hplCtx = options.hplSkills.length > 0 ? '\nHPL VAAs to keep: ' + options.hplSkills.join(', ') + '\n' : '';
+
+  var prompt = SYS +
+    '\n\nREGENERATION:\n' +
+    (instr ? 'Teacher says: "' + instr + '"' : 'Produce a fresh variation.') +
+    hplCtx +
+    '\n\nOriginal feedback:\n"' + currentRaw + '"' +
+    '\n\nCurrent version:\n"' + currentFb + '"' +
+    '\n\nReturn ONLY the new feedback comment.';
+
+  var payload = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { temperature: 0.8, maxOutputTokens: 1024 }
+  };
+
+  callAPI(payload, function(result) {
+    out.style.opacity = '1';
+    if (result.success) {
+      currentFb = result.feedback;
+      out.textContent = result.feedback;
+      document.getElementById('tweakIn').value = '';
+    } else { showErr('reErr', result.error); }
+  });
+}
+
+// ═══ API CALL ═══
+function callAPI(payload, callback) {
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(json) {
+    if (json.error) {
+      callback({ success: false, error: 'API error: ' + json.error.message });
+    } else {
+      callback({ success: true, feedback: json.candidates[0].content.parts[0].text.trim() });
+    }
+  })
+  .catch(function(e) {
+    callback({ success: false, error: 'Network error: ' + e.message });
+  });
+}
+
+// ═══ COPY ═══
+function copyFb() {
+  var text = document.getElementById('fOut').textContent;
+  if (!text) return;
+  navigator.clipboard.writeText(text).then(function() { showToast('Copied to clipboard'); });
+}
+
+// ═══ CLEAR ═══
+function clearAll() {
+  document.getElementById('transcript').value = '';
+  document.getElementById('sName').value = '';
+  document.getElementById('ctx').value = '';
+  document.getElementById('tone').selectedIndex = 0;
+  document.getElementById('hdd').selectedIndex = 0;
+  document.getElementById('outCard').classList.add('hid');
+  document.getElementById('tweakIn').value = '';
+  document.getElementById('micSt').textContent = 'Tap the mic to record your voice';
+  document.getElementById('micSt').classList.remove('act');
+  hplSkills = []; renderHpl();
+  hideErr('genErr'); hideErr('reErr');
+  currentRaw = ''; currentFb = '';
+  audioBase64 = null; audioChunks = [];
+}
+
+// ═══ HELPERS ═══
+function showErr(id, msg) { var e = document.getElementById(id); e.textContent = msg; e.classList.remove('hid'); }
+function hideErr(id) { document.getElementById(id).classList.add('hid'); }
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2600);
+}
+</script>
+
+</body>
+</html>
