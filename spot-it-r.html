@@ -476,13 +476,13 @@ function rand(min, max) { return min + Math.random() * (max - min); }
 // CARD GENERATION
 // ═══════════════════════════════════════════════════════════════════
 function generateCard(count) {
-  return shuffle(R_ITEMS).slice(0, count || (3 + Math.floor(Math.random() * 3)));
+  return shuffle(R_ITEMS).slice(0, count || (6 + Math.floor(Math.random() * 2)));
 }
 
 function generateMatchingCard(refCard) {
   const shared = refCard[Math.floor(Math.random() * refCard.length)];
   const others = shuffle(R_ITEMS.filter(x => !refCard.some(r => r.word === x.word)));
-  const count = 3 + Math.floor(Math.random() * 3);
+  const count = 6 + Math.floor(Math.random() * 2);
   return {
     card: shuffle([shared, ...others.slice(0, count - 1)]),
     match: shared
@@ -500,13 +500,13 @@ function computePositions(count, sizes, discPx) {
 
   for (let i = 0; i < count; i++) {
     const size = sizes[i];
-    const margin = size * 0.6;
+    const margin = size * 0.52;
     let placed = false;
 
-    for (let attempt = 0; attempt < 100; attempt++) {
-      const angle = baseAngle + angleStep * i + rand(-angleStep * 0.42, angleStep * 0.42);
-      const maxR = center - margin - 4;
-      const r = rand(center * 0.08, maxR);
+    for (let attempt = 0; attempt < 160; attempt++) {
+      const angle = baseAngle + angleStep * i + rand(-angleStep * 0.48, angleStep * 0.48);
+      const maxR = center - margin - 3;
+      const r = rand(center * 0.06, maxR);
       const x = center + r * Math.cos(angle);
       const y = center + r * Math.sin(angle);
 
@@ -514,7 +514,7 @@ function computePositions(count, sizes, discPx) {
 
       const overlaps = positions.some(p => {
         const d = Math.sqrt((x - p.rx) ** 2 + (y - p.ry) ** 2);
-        return d < (size + p.size) * 0.62;
+        return d < (size + p.size) * 0.54;
       });
 
       if (!overlaps) {
@@ -564,10 +564,11 @@ function renderDisc(discEl, items, animate) {
   const discPx = discEl.offsetWidth;
   const showWords = document.getElementById('showLabels').checked;
 
-  // Varied sizes: some big, some small
+  // Dramatic size variation: very large down to very small
   const sizePool = shuffle([
-    discPx * 0.21, discPx * 0.17, discPx * 0.24,
-    discPx * 0.15, discPx * 0.19,
+    discPx * 0.27, discPx * 0.25,   // large
+    discPx * 0.18, discPx * 0.17,   // medium
+    discPx * 0.11, discPx * 0.10, discPx * 0.09,  // small
   ]).slice(0, items.length);
 
   const positions = computePositions(items.length, sizePool, discPx);
