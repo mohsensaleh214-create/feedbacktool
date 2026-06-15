@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Spot It — Letter R 🌈</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Comic Sans MS', 'Chalkboard SE', 'Bradley Hand', cursive, sans-serif;
+      background: #fff5f5;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(231,76,60,0.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(243,156,18,0.06) 0%, transparent 50%),
+        radial-gradient(circle at 50% 50%, rgba(155,89,182,0.04) 0%, transparent 60%);
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+      touch-action: pan-y;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .game-wrapper {
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 10px 16px;
+      min-height: 100dvh;
+    }
+
+    /* ─── HEADER ─── */
+    .header {
+      text-align: center;
+      margin-bottom: 6px;
+      width: 100%;
+    }
+
+    .title {
+      font-size: clamp(1.5rem, 5.5vw, 2.6rem);
+      color: #c0392b;
+      text-shadow: 2px 2px 0 rgba(192,57,43,0.15);
+      line-height: 1.15;
+    }
+
+    .big-r {
+      display: inline-block;
+      font-size: 1.35em;
+      color: #e74c3c;
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      filter: drop-shadow(2px 2px 1px rgba(192,57,43,0.3));
+    }
+
+    .subtitle {
+      font-size: clamp(0.78rem, 2.2vw, 1rem);
+      color: #888;
+      margin-top: 2px;
+    }
+
+    /* ─── SCORE BAR ─── */
+    .score-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 6px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .score-pill {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      color: white;
+      padding: 5px 18px;
+      border-radius: 25px;
+      font-size: clamp(0.85rem, 2.5vw, 1rem);
+      font-weight: bold;
+      box-shadow: 0 3px 10px rgba(231,76,60,0.35);
+      letter-spacing: 0.02em;
+      transition: transform 0.15s;
+    }
+
+    .score-pill.bump {
+      animation: scoreBump 0.35s ease;
+    }
+
+    @keyframes scoreBump {
+      0% { transform: scale(1); }
+      40% { transform: scale(1.25); }
+      100% { transform: scale(1); }
+    }
+
+    .label-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: clamp(0.72rem, 2vw, 0.85rem);
+      color: #777;
+      cursor: pointer;
+      background: white;
+      border: 1.5px solid #eee;
+      border-radius: 20px;
+      padding: 4px 12px;
+    }
+
+    .label-toggle input {
+      accent-color: #e74c3c;
+      width: 14px;
+      height: 14px;
+      cursor: pointer;
+    }
+
+    /* ─── INSTRUCTION ─── */
+    .instruction {
+      background: white;
+      border: 2px solid #ffd0cc;
+      border-radius: 14px;
+      padding: 7px 16px;
+      font-size: clamp(0.75rem, 2.2vw, 0.92rem);
+      color: #444;
+      text-align: center;
+      margin: 4px 0 8px;
+      box-shadow: 0 2px 8px rgba(231,76,60,0.08);
+      max-width: 440px;
+    }
+
+    /* ─── GAME AREA ─── */
+    .game-area {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(8px, 3vw, 28px);
+      width: 100%;
+      flex: 1;
+    }
+
+    /* ─── DISC ─── */
+    .disc-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .disc-label {
+      font-size: clamp(0.7rem, 1.8vw, 0.85rem);
+      color: #bbb;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .disc {
+      --ds: clamp(145px, 38vmin, 270px);
+      width: var(--ds);
+      height: var(--ds);
+      border-radius: 50%;
+      background: white;
+      border: 5px solid #e74c3c;
+      box-shadow:
+        0 6px 24px rgba(231,76,60,0.18),
+        0 2px 6px rgba(0,0,0,0.08),
+        inset 0 -4px 12px rgba(231,76,60,0.05);
+      position: relative;
+      overflow: hidden;
+      transition: box-shadow 0.3s, transform 0.3s;
+    }
+
+    /* gloss highlight */
+    .disc::after {
+      content: '';
+      position: absolute;
+      top: 6%;
+      left: 12%;
+      width: 35%;
+      height: 22%;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.75) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .disc.fade-in {
+      animation: discFadeIn 0.35s ease forwards;
+    }
+
+    @keyframes discFadeIn {
+      from { opacity: 0; transform: scale(0.85); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    .disc.found {
+      box-shadow:
+        0 0 0 5px rgba(255,215,0,0.7),
+        0 0 50px rgba(255,200,0,0.5),
+        0 6px 24px rgba(231,76,60,0.18);
+      transform: scale(1.04);
+    }
+
+    /* ─── ITEM ─── */
+    .item {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transform-origin: center center;
+      transition: filter 0.15s;
+      z-index: 2;
+    }
+
+    .item:hover .emoji { filter: drop-shadow(0 0 6px rgba(231,76,60,0.5)); }
+
+    .item.wrong {
+      animation: wrongShake 0.35s ease;
+    }
+
+    @keyframes wrongShake {
+      0%, 100% { transform: translate(-50%, -50%) rotate(var(--rot)); }
+      20%       { transform: translate(calc(-50% - 8px), -50%) rotate(var(--rot)); }
+      60%       { transform: translate(calc(-50% + 8px), -50%) rotate(var(--rot)); }
+    }
+
+    .item .emoji {
+      display: block;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    .item .word {
+      font-weight: bold;
+      color: #333;
+      text-align: center;
+      line-height: 1.15;
+      pointer-events: none;
+      margin-top: 1px;
+      white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(255,255,255,0.9);
+    }
+
+    /* ─── MIDDLE BADGE ─── */
+    .mid-badge {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .search-icon {
+      font-size: clamp(1.4rem, 4vw, 2rem);
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+    }
+
+    .vs-text {
+      font-size: 0.7rem;
+      color: #ccc;
+      letter-spacing: 0.06em;
+    }
+
+    /* ─── CONTROLS ─── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .next-btn {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      color: white;
+      border: none;
+      border-radius: 30px;
+      padding: 10px 26px;
+      font-size: clamp(0.9rem, 2.5vw, 1.05rem);
+      font-family: inherit;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(231,76,60,0.4);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .next-btn:active {
+      transform: scale(0.93);
+      box-shadow: 0 2px 6px rgba(231,76,60,0.3);
+    }
+
+    .swipe-hint {
+      color: #bbb;
+      font-size: clamp(0.72rem, 2vw, 0.85rem);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .swipe-arrow {
+      display: inline-block;
+      animation: swipeAnim 1.6s ease-in-out infinite;
+    }
+
+    @keyframes swipeAnim {
+      0%, 100% { transform: translateX(0); opacity: 0.4; }
+      50%       { transform: translateX(8px); opacity: 1; }
+    }
+
+    /* ─── SUCCESS OVERLAY ─── */
+    #success-overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    #success-overlay.show { opacity: 1; }
+
+    .success-bubble {
+      background: linear-gradient(135deg, #e74c3c, #c0392b);
+      color: white;
+      padding: 16px 32px;
+      border-radius: 24px;
+      font-size: clamp(1.4rem, 6vw, 2.4rem);
+      font-weight: bold;
+      box-shadow: 0 10px 40px rgba(231,76,60,0.55), 0 0 0 4px rgba(255,255,255,0.3);
+      text-align: center;
+      transform: scale(0.4) rotate(-8deg);
+      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    #success-overlay.show .success-bubble {
+      transform: scale(1) rotate(0deg);
+    }
+
+    /* ─── CONFETTI ─── */
+    .conf {
+      position: fixed;
+      pointer-events: none;
+      z-index: 300;
+      border-radius: 2px;
+    }
+
+    /* ─── MOBILE portrait stacks vertically ─── */
+    @media (max-width: 480px) {
+      .game-area {
+        flex-direction: column;
+        gap: 8px;
+      }
+      .mid-badge {
+        flex-direction: row;
+        gap: 8px;
+      }
+      .vs-text { display: none; }
+    }
+
+    /* ─── LANDSCAPE short screens ─── */
+    @media (max-height: 560px) and (orientation: landscape) {
+      .disc { --ds: clamp(110px, 32vmin, 190px); }
+      .header { margin-bottom: 2px; }
+      .instruction { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="game-wrapper">
+
+  <div class="header">
+    <div class="title"><span class="big-r">R</span> is for Red — Spot It!</div>
+    <div class="subtitle">Find the matching picture and say the word out loud!</div>
+  </div>
+
+  <div class="score-bar">
+    <div class="score-pill" id="score-display">⭐ 0</div>
+    <label class="label-toggle">
+      <input type="checkbox" id="showLabels" checked> Show words
+    </label>
+  </div>
+
+  <div class="instruction">
+    👀 Find the <strong>ONE picture</strong> that appears on <strong>BOTH</strong> discs — say the word!
+  </div>
+
+  <div class="game-area" id="game-area">
+    <div class="disc-wrap">
+      <div class="disc-label">Disc A</div>
+      <div class="disc" id="disc-a"></div>
+    </div>
+    <div class="mid-badge">
+      <div class="search-icon">🔍</div>
+      <div class="vs-text">FIND<br>MATCH</div>
+    </div>
+    <div class="disc-wrap">
+      <div class="disc-label">Disc B</div>
+      <div class="disc" id="disc-b"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="next-btn" id="next-btn" onclick="nextRound()">Next ➡️</button>
+    <div class="swipe-hint">or swipe right <span class="swipe-arrow">→</span></div>
+  </div>
+
+</div>
+
+<div id="success-overlay">
+  <div class="success-bubble" id="success-bubble"></div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// R ITEMS  — all start with the letter R
+// ═══════════════════════════════════════════════════════════════════
+const R_ITEMS = [
+  { emoji: '🌈', word: 'Rainbow'   },
+  { emoji: '🐰', word: 'Rabbit'    },
+  { emoji: '🚀', word: 'Rocket'    },
+  { emoji: '🌹', word: 'Rose'      },
+  { emoji: '🌧️', word: 'Rain'      },
+  { emoji: '🧥', word: 'Raincoat'  },
+  { emoji: '💍', word: 'Ring'      },
+  { emoji: '🤖', word: 'Robot'     },
+  { emoji: '🪢', word: 'Rope'      },
+  { emoji: '📏', word: 'Ruler'     },
+  { emoji: '🦌', word: 'Reindeer'  },
+  { emoji: '🦝', word: 'Raccoon'   },
+  { emoji: '🦏', word: 'Rhino'     },
+  { emoji: '🏎️', word: 'Race car'  },
+  { emoji: '🍎', word: 'Red apple' },
+  { emoji: '🐓', word: 'Rooster'   },
+  { emoji: '🪨', word: 'Rock'      },
+  { emoji: '🎀', word: 'Ribbon'    },
+  { emoji: '🎒', word: 'Rucksack'  },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
+let score = 0;
+let cardA = [];
+let cardB = [];
+let matchItem = null;
+let roundActive = false;
+
+// ═══════════════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════════════
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function rand(min, max) { return min + Math.random() * (max - min); }
+
+// ═══════════════════════════════════════════════════════════════════
+// CARD GENERATION
+// ═══════════════════════════════════════════════════════════════════
+function generateCard(count) {
+  return shuffle(R_ITEMS).slice(0, count || (6 + Math.floor(Math.random() * 2)));
+}
+
+function generateMatchingCard(refCard) {
+  const shared = refCard[Math.floor(Math.random() * refCard.length)];
+  const others = shuffle(R_ITEMS.filter(x => !refCard.some(r => r.word === x.word)));
+  const count = 6 + Math.floor(Math.random() * 2);
+  return {
+    card: shuffle([shared, ...others.slice(0, count - 1)]),
+    match: shared
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PLACEMENT  — non-overlapping polar layout
+// ═══════════════════════════════════════════════════════════════════
+function computePositions(count, sizes, discPx) {
+  const center = discPx / 2;
+  const positions = [];
+  const angleStep = (2 * Math.PI) / count;
+  const baseAngle = Math.random() * Math.PI * 2;
+
+  for (let i = 0; i < count; i++) {
+    const size = sizes[i];
+    const margin = size * 0.52;
+    let placed = false;
+
+    for (let attempt = 0; attempt < 160; attempt++) {
+      const angle = baseAngle + angleStep * i + rand(-angleStep * 0.48, angleStep * 0.48);
+      const maxR = center - margin - 3;
+      const r = rand(center * 0.06, maxR);
+      const x = center + r * Math.cos(angle);
+      const y = center + r * Math.sin(angle);
+
+      if (Math.sqrt((x - center) ** 2 + (y - center) ** 2) + margin > center) continue;
+
+      const overlaps = positions.some(p => {
+        const d = Math.sqrt((x - p.rx) ** 2 + (y - p.ry) ** 2);
+        return d < (size + p.size) * 0.54;
+      });
+
+      if (!overlaps) {
+        positions.push({
+          xPct: (x / discPx) * 100,
+          yPct: (y / discPx) * 100,
+          rx: x, ry: y,
+          size,
+          rot: rand(-28, 28),
+        });
+        placed = true;
+        break;
+      }
+    }
+
+    if (!placed) {
+      // fallback — just place at the angle
+      const angle = baseAngle + angleStep * i;
+      const r = center * 0.45;
+      const x = center + r * Math.cos(angle);
+      const y = center + r * Math.sin(angle);
+      positions.push({
+        xPct: (x / discPx) * 100,
+        yPct: (y / discPx) * 100,
+        rx: x, ry: y,
+        size,
+        rot: rand(-28, 28),
+      });
+    }
+  }
+  return positions;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════════
+function renderDisc(discEl, items, animate) {
+  discEl.innerHTML = '';
+  discEl.classList.remove('found');
+  if (animate) {
+    discEl.classList.remove('fade-in');
+    // force reflow
+    void discEl.offsetWidth;
+    discEl.classList.add('fade-in');
+  }
+
+  const discPx = discEl.offsetWidth;
+  const showWords = document.getElementById('showLabels').checked;
+
+  // Dramatic size variation: very large down to very small
+  const sizePool = shuffle([
+    discPx * 0.27, discPx * 0.25,   // large
+    discPx * 0.18, discPx * 0.17,   // medium
+    discPx * 0.11, discPx * 0.10, discPx * 0.09,  // small
+  ]).slice(0, items.length);
+
+  const positions = computePositions(items.length, sizePool, discPx);
+
+  items.forEach((item, i) => {
+    const pos = positions[i];
+    const el = document.createElement('div');
+    el.className = 'item';
+    el.style.left   = `${pos.xPct}%`;
+    el.style.top    = `${pos.yPct}%`;
+    el.style.setProperty('--rot', `${pos.rot}deg`);
+    el.style.transform = `translate(-50%, -50%) rotate(${pos.rot}deg)`;
+
+    const emojiEl = document.createElement('span');
+    emojiEl.className = 'emoji';
+    emojiEl.style.fontSize = `${pos.size}px`;
+    emojiEl.textContent = item.emoji;
+    el.appendChild(emojiEl);
+
+    if (showWords) {
+      const wordEl = document.createElement('span');
+      wordEl.className = 'word';
+      wordEl.style.fontSize = `${Math.max(pos.size * 0.28, 8)}px`;
+      wordEl.textContent = item.word;
+      el.appendChild(wordEl);
+    }
+
+    el.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      handleTap(item, el, pos.rot);
+    });
+
+    discEl.appendChild(el);
+  });
+}
+
+function rerenderBoth() {
+  renderDisc(document.getElementById('disc-a'), cardA, false);
+  renderDisc(document.getElementById('disc-b'), cardB, false);
+}
+
+document.getElementById('showLabels').addEventListener('change', rerenderBoth);
+
+// ═══════════════════════════════════════════════════════════════════
+// GAME LOGIC
+// ═══════════════════════════════════════════════════════════════════
+function handleTap(item, el, rot) {
+  if (!roundActive) return;
+
+  if (item.word === matchItem.word) {
+    roundActive = false;
+    score++;
+
+    const pill = document.getElementById('score-display');
+    pill.textContent = `⭐ ${score}`;
+    pill.classList.remove('bump');
+    void pill.offsetWidth;
+    pill.classList.add('bump');
+
+    document.getElementById('disc-a').classList.add('found');
+    document.getElementById('disc-b').classList.add('found');
+
+    showSuccess(item);
+  } else {
+    el.classList.remove('wrong');
+    void el.offsetWidth;
+    el.classList.add('wrong');
+    el.addEventListener('animationend', () => el.classList.remove('wrong'), { once: true });
+  }
+}
+
+function showSuccess(item) {
+  const overlay = document.getElementById('success-overlay');
+  const bubble  = document.getElementById('success-bubble');
+  bubble.textContent = `${item.emoji} ${item.word}! 🎉`;
+  overlay.classList.add('show');
+
+  speakWord(item.word);
+  launchConfetti();
+
+  setTimeout(() => overlay.classList.remove('show'), 1900);
+}
+
+function nextRound() {
+  if (!cardA.length) {
+    cardA = generateCard();
+  } else {
+    cardA = cardB;
+  }
+
+  const result = generateMatchingCard(cardA);
+  cardB = result.card;
+  matchItem = result.match;
+  roundActive = true;
+
+  const dA = document.getElementById('disc-a');
+  const dB = document.getElementById('disc-b');
+  dA.classList.remove('found');
+  dB.classList.remove('found');
+
+  renderDisc(dA, cardA, true);
+  renderDisc(dB, cardB, true);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SPEECH
+// ═══════════════════════════════════════════════════════════════════
+function speakWord(word) {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(word);
+  utt.lang  = 'en-GB';
+  utt.rate  = 0.78;
+  utt.pitch = 1.1;
+  window.speechSynthesis.speak(utt);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONFETTI
+// ═══════════════════════════════════════════════════════════════════
+const CONF_COLORS = ['#e74c3c','#f39c12','#27ae60','#3498db','#9b59b6','#f1c40f','#e91e63','#1abc9c'];
+
+function launchConfetti() {
+  for (let i = 0; i < 55; i++) {
+    setTimeout(() => {
+      const p  = document.createElement('div');
+      p.className = 'conf';
+      const sz = rand(7, 14);
+      const cx = rand(15, 85);
+      p.style.cssText = `
+        width:${sz}px; height:${sz}px;
+        background:${CONF_COLORS[Math.floor(Math.random() * CONF_COLORS.length)]};
+        left:${cx}vw; top:-${sz}px;
+        border-radius:${Math.random() > 0.45 ? '50%' : '2px'};
+      `;
+      document.body.appendChild(p);
+      const dur  = rand(1100, 2000);
+      const dx   = rand(-160, 160);
+      const spin = rand(-540, 540);
+      p.animate([
+        { transform: `translateX(0) translateY(0) rotate(0deg)`,    opacity: 1 },
+        { transform: `translateX(${dx}px) translateY(${window.innerHeight + sz + 20}px) rotate(${spin}deg)`, opacity: 0 }
+      ], { duration: dur, easing: 'cubic-bezier(0.25,0.46,0.45,0.94)', fill: 'forwards' });
+      setTimeout(() => p.remove(), dur + 50);
+    }, i * 22);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SWIPE / DRAG
+// ═══════════════════════════════════════════════════════════════════
+let ptStartX = 0;
+let ptStartY = 0;
+let dragging = false;
+
+document.addEventListener('pointerdown', e => {
+  if (e.target.closest('.item') || e.target.closest('.next-btn') || e.target.closest('.label-toggle')) return;
+  ptStartX = e.clientX;
+  ptStartY = e.clientY;
+  dragging = false;
+}, { passive: true });
+
+document.addEventListener('pointermove', e => {
+  if (Math.abs(e.clientX - ptStartX) > 12) dragging = true;
+}, { passive: true });
+
+document.addEventListener('pointerup', e => {
+  if (!dragging) return;
+  const dx = e.clientX - ptStartX;
+  const dy = e.clientY - ptStartY;
+  if (Math.abs(dx) > Math.abs(dy) && dx > 55) nextRound();
+  dragging = false;
+}, { passive: true });
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') nextRound();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// START
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  // small delay so the disc has rendered size
+  setTimeout(nextRound, 80);
+});
+</script>
+</body>
+</html>
