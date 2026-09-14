@@ -12,6 +12,11 @@ var CONFIG = {
   // Emails allowed to view the admin dashboard.
   ADMIN_EMAILS: ['mohsensaleh214@gmail.com'],
 
+  // Drive file IDs for branding images (upload to Drive, paste the ID from
+  // the share link). Left blank shows the text wordmark / no hero banner.
+  LOGO_FILE_ID: '',
+  HERO_IMAGE_FILE_ID: '',
+
   // Reading-gate dwell timer: seconds required per PDF page, clamped
   // between a floor and ceiling so very short or very long policies
   // still get a sane requirement.

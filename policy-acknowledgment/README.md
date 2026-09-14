@@ -69,6 +69,7 @@ once (see Setup below) to create these tabs automatically:
 7. Run `installWeeklyReminderTrigger` (from `Setup.gs`) to turn on the weekly outstanding-policy reminder email.
 8. **Deploy → New deployment → Web app**. Execute as **Me**, access **Anyone within [your domain]** — this matches `appsscript.json`'s `webapp` block.
 9. Update `CONFIG.ALLOWED_DOMAIN` in `Config.gs` if it isn't already `miskschools.edu.sa`, and confirm `CONFIG.ADMIN_EMAILS` lists everyone who should see the admin dashboard.
+10. Optional: upload the Misk logo and a campus photo to Drive, then paste their file IDs into `CONFIG.LOGO_FILE_ID` / `CONFIG.HERO_IMAGE_FILE_ID` in `Config.gs` (see "Logo + hero photo" below).
 
 ## 4. Content status
 
@@ -86,11 +87,17 @@ once (see Setup below) to create these tabs automatically:
   they only need a Drive file — no key points or quiz.
 - **PDFs**: no files are bundled in this repo. Upload each policy's PDF to
   Drive and fill in its `DriveFileID` per the deployment steps above.
-- **Brand colours/logo**: `Styles.html` uses a placeholder neutral
-  palette (off-white, charcoal, a muted bronze accent) documented at the
-  top of the file as CSS custom properties. Swap the `--accent*` and
-  `--ink*` values once Misk's brand colours are confirmed — nothing else
+- **Brand colours**: `Styles.html` uses Misk Schools green (`--accent`,
+  `--accent-ink`, `--accent-soft` CSS custom properties near the top of
+  the file), estimated from the logo. Fine-tune those three hex values
+  against Misk's brand guideline if you have exact codes — nothing else
   needs to change.
+- **Logo + hero photo**: set `CONFIG.LOGO_FILE_ID` and
+  `CONFIG.HERO_IMAGE_FILE_ID` in `Config.gs` to Drive file IDs (same
+  "upload to Drive, copy the ID from the share link" pattern as the
+  policy PDFs). The logo shows in the header; the hero photo shows as a
+  banner at the top of the staff dashboard. Leaving either blank just
+  omits that element — no error.
 
 ## 5. Reading-gate tuning
 

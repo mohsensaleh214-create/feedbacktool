@@ -2,21 +2,34 @@
   var App = {
     user: null,
     config: null,
+    assets: {},
     currentPolicy: null,
 
     init: function(user) {
       App.user = user;
       Utils.run('getAppConfig', [], function(cfg) {
         App.config = cfg;
-        App.renderHeader();
-        App.loadDashboard();
+        Utils.run('getBrandAssets', [], function(assets) {
+          App.assets = assets || {};
+          App.renderHeader();
+          App.loadDashboard();
+        }, function() {
+          App.assets = {};
+          App.renderHeader();
+          App.loadDashboard();
+        });
       });
     },
 
     renderHeader: function() {
       var header = document.getElementById('app-header');
+      var logoImg = (App.assets && App.assets.logo)
+        ? '<img class="brand-logo" src="data:' + App.assets.logo.mimeType + ';base64,' + App.assets.logo.base64 + '" alt="Misk Schools logo" />'
+        : '';
       header.innerHTML =
-        '<div class="brand"><span class="brand-mark">Misk Schools</span><span class="brand-sub">Policy Acknowledgment</span></div>' +
+        '<div class="brand">' + logoImg +
+          '<div class="brand-text"><span class="brand-mark">Misk Schools</span><span class="brand-sub">Policy Acknowledgment</span></div>' +
+        '</div>' +
         '<nav class="app-nav">' +
           '<button class="nav-link" data-nav="dashboard">Dashboard</button>' +
           (App.user.isAdmin ? '<button class="nav-link" data-nav="admin">Admin</button>' : '') +
@@ -40,8 +53,12 @@
       var root = document.getElementById('screen-dashboard');
       var total = data.tier1.length + data.tier2.length;
       var done = data.tier1.concat(data.tier2).filter(function(p) { return p.status === 'Completed'; }).length;
+      var hero = (App.assets && App.assets.hero)
+        ? '<div class="hero-banner"><img src="data:' + App.assets.hero.mimeType + ';base64,' + App.assets.hero.base64 + '" alt="Misk Schools campus" /></div>'
+        : '';
 
       root.innerHTML =
+        hero +
         '<div class="page-head">' +
           '<h1>Your policies</h1>' +
           '<p class="page-sub">' + done + ' of ' + total + ' acknowledged</p>' +

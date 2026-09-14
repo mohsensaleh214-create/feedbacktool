@@ -1,19 +1,21 @@
 <script>
   /**
-   * PDF.js viewer with the reading gate. Pages are rendered one at a time
-   * (not a continuous scroll) so "reached the final page" is a real
-   * PDF.js page-change event, not something scroll position could fake.
-   * Continue stays disabled until both the dwell timer and the last-page
-   * visit condition are met.
+   * PDF.js viewer with the reading gate. All pages render into one
+   * continuously scrollable panel (swipe/scroll like a normal document)
+   * at device-pixel-ratio-aware resolution so text stays sharp. "Reached
+   * the end" is driven by an IntersectionObserver on the last page, so
+   * it's a real visibility signal, not just a scroll-position guess.
+   * Continue stays disabled until both that and the dwell timer clear.
    */
   var Viewer = {
     pdfDoc: null,
-    pageNum: 1,
     numPages: 0,
     reachedLastPage: false,
     dwellElapsed: 0,
     dwellRequired: 0,
     dwellTimer: null,
+    observer: null,
+    pageEls: [],
 
     open: function(policyDetail) {
       Utils.showScreen('screen-viewer');
@@ -23,37 +25,35 @@
           '<button class="text-btn" id="viewer-back">&larr; Back to dashboard</button>' +
           '<h1>' + Utils.escapeHtml(policyDetail.name) + '</h1>' +
         '</div>' +
-        '<div class="dwell-bar"><div class="dwell-bar-fill" id="dwell-fill"></div></div>' +
-        '<div class="viewer-frame"><div class="pdf-canvas-wrap"><canvas id="pdf-canvas"></canvas></div></div>' +
-        '<div class="viewer-controls">' +
-          '<button class="btn btn-outline" id="pdf-prev">Previous</button>' +
-          '<span class="page-counter" id="page-counter">Loading…</span>' +
-          '<button class="btn btn-outline" id="pdf-next">Next</button>' +
+        '<div class="progress-bar"><div class="progress-bar-fill" id="dwell-fill"></div></div>' +
+        '<div class="pdf-scroll" id="pdf-scroll">' +
+          '<div class="pdf-page-counter" id="page-counter">Loading…</div>' +
+          '<div class="pdf-pages" id="pdf-pages"></div>' +
+        '</div>' +
+        '<div class="viewer-controls single">' +
           '<button class="btn btn-primary" id="viewer-continue" disabled>Continue</button>' +
         '</div>' +
-        '<p class="viewer-hint" id="viewer-hint">Taking a moment to read the whole document unlocks Continue.</p>';
+        '<p class="viewer-hint" id="viewer-hint">Scroll all the way through to unlock Continue.</p>';
 
       document.getElementById('viewer-back').addEventListener('click', App.loadDashboard);
-      document.getElementById('pdf-prev').addEventListener('click', function() { Viewer.renderPage(Viewer.pageNum - 1); });
-      document.getElementById('pdf-next').addEventListener('click', function() { Viewer.renderPage(Viewer.pageNum + 1); });
       document.getElementById('viewer-continue').addEventListener('click', function() { Viewer.continue_(policyDetail); });
 
       Viewer.reset_();
       Utils.run('getPolicyPdfBase64', [policyDetail.driveFileId], function(res) { Viewer.load_(res); }, function(err) {
-        document.querySelector('#screen-viewer .viewer-frame').innerHTML =
-          '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
+        document.getElementById('pdf-pages').innerHTML = '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
         console.error(err);
       });
     },
 
     reset_: function() {
       Viewer.pdfDoc = null;
-      Viewer.pageNum = 1;
       Viewer.numPages = 0;
       Viewer.reachedLastPage = false;
       Viewer.dwellElapsed = 0;
       Viewer.dwellRequired = 0;
+      Viewer.pageEls = [];
       if (Viewer.dwellTimer) clearInterval(Viewer.dwellTimer);
+      if (Viewer.observer) Viewer.observer.disconnect();
     },
 
     load_: function(res) {
@@ -70,10 +70,9 @@
           Math.max(App.config.minDwellSeconds, pdf.numPages * perPage)
         );
         Viewer.startDwellTimer_();
-        Viewer.renderPage(1);
+        Viewer.renderAllPages_();
       }).catch(function(err) {
-        document.querySelector('#screen-viewer .viewer-frame').innerHTML =
-          '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
+        document.getElementById('pdf-pages').innerHTML = '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
         console.error(err);
       });
     },
@@ -87,26 +86,69 @@
       }, 1000);
     },
 
-    renderPage: function(n) {
-      if (!Viewer.pdfDoc || n < 1 || n > Viewer.numPages) return;
-      Viewer.pageNum = n;
-      Viewer.pdfDoc.getPage(n).then(function(page) {
-        var canvas = document.getElementById('pdf-canvas');
-        var container = canvas.parentElement;
-        var unscaled = page.getViewport({ scale: 1 });
-        var scale = Math.min(1.6, (container.clientWidth - 4) / unscaled.width);
-        var viewport = page.getViewport({ scale: scale > 0 ? scale : 1 });
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+    /** Renders every page up front at a device-pixel-ratio-aware scale so text stays crisp when the container is fairly wide. */
+    renderAllPages_: function() {
+      var container = document.getElementById('pdf-pages');
+      container.innerHTML = '';
+      Viewer.pageEls = [];
 
-        document.getElementById('page-counter').textContent = 'Page ' + n + ' of ' + Viewer.numPages;
-        document.getElementById('pdf-prev').disabled = n <= 1;
-        document.getElementById('pdf-next').disabled = n >= Viewer.numPages;
+      var dpr = window.devicePixelRatio || 1;
+      var containerWidth = document.getElementById('pdf-scroll').clientWidth - 32;
+      var renderPromises = [];
 
-        if (n === Viewer.numPages) Viewer.reachedLastPage = true;
-        Viewer.maybeEnableContinue_();
+      for (var n = 1; n <= Viewer.numPages; n++) {
+        (function(pageNum) {
+          renderPromises.push(
+            Viewer.pdfDoc.getPage(pageNum).then(function(page) {
+              var wrap = document.createElement('div');
+              wrap.className = 'pdf-page';
+              wrap.setAttribute('data-page', pageNum);
+              var canvas = document.createElement('canvas');
+              wrap.appendChild(canvas);
+              container.appendChild(wrap);
+              Viewer.pageEls.push(wrap);
+
+              var unscaled = page.getViewport({ scale: 1 });
+              var targetWidth = Math.min(880, containerWidth > 0 ? containerWidth : 700);
+              var scale = (targetWidth / unscaled.width) * dpr;
+              var viewport = page.getViewport({ scale: scale });
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+              canvas.style.width = (viewport.width / dpr) + 'px';
+              canvas.style.height = (viewport.height / dpr) + 'px';
+
+              return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+            })
+          );
+        })(n);
+      }
+
+      Promise.all(renderPromises).then(function() {
+        var counter = document.getElementById('page-counter');
+        if (counter) counter.textContent = 'Page 1 of ' + Viewer.numPages;
+        Viewer.watchPages_();
       });
+    },
+
+    watchPages_: function() {
+      var counter = document.getElementById('page-counter');
+      var scrollRoot = document.getElementById('pdf-scroll');
+      if (!counter || !scrollRoot) return;
+
+      Viewer.observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            var pageNum = Number(entry.target.getAttribute('data-page'));
+            counter.textContent = 'Page ' + pageNum + ' of ' + Viewer.numPages;
+            if (pageNum === Viewer.numPages) {
+              Viewer.reachedLastPage = true;
+              Viewer.maybeEnableContinue_();
+            }
+          }
+        });
+      }, { root: scrollRoot, threshold: [0.5] });
+
+      Viewer.pageEls.forEach(function(el) { Viewer.observer.observe(el); });
     },
 
     maybeEnableContinue_: function() {
@@ -117,11 +159,12 @@
       btn.disabled = !ready;
       hint.textContent = ready
         ? 'You’re ready to continue.'
-        : (Viewer.reachedLastPage ? 'Almost there — just a little more time.' : 'Page through to the end to continue.');
+        : (Viewer.reachedLastPage ? 'Almost there — just a little more time.' : 'Scroll all the way through to unlock Continue.');
     },
 
     continue_: function(policyDetail) {
       if (Viewer.dwellTimer) clearInterval(Viewer.dwellTimer);
+      if (Viewer.observer) Viewer.observer.disconnect();
       if (policyDetail.tier === 1) {
         KeyPoints.open(policyDetail);
       } else {

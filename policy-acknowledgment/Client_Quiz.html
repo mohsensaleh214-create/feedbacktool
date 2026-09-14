@@ -40,12 +40,16 @@
 
     renderQuestion: function() {
       var q = Quiz.questions[Quiz.index];
+      var pct = Math.round((Quiz.index / Quiz.questions.length) * 100);
       var root = document.getElementById('screen-quiz');
       root.innerHTML =
-        '<div class="page-head-narrow"><span class="eyebrow">Question ' + (Quiz.index + 1) + ' of ' + Quiz.questions.length + '</span>' +
-        '<h1>' + Utils.escapeHtml(q.text) + '</h1></div>' +
-        '<div class="quiz-options">' +
-          q.options.map(function(o) { return '<button class="quiz-option" data-key="' + o.key + '">' + Utils.escapeHtml(o.text) + '</button>'; }).join('') +
+        '<div class="quiz-wrap">' +
+          '<div class="progress-bar"><div class="progress-bar-fill" style="width:' + pct + '%"></div></div>' +
+          '<span class="eyebrow">Question ' + (Quiz.index + 1) + ' of ' + Quiz.questions.length + '</span>' +
+          '<h1 class="quiz-question">' + Utils.escapeHtml(q.text) + '</h1>' +
+          '<div class="quiz-options">' +
+            q.options.map(function(o) { return '<button class="quiz-option" data-key="' + o.key + '">' + Utils.escapeHtml(o.text) + '</button>'; }).join('') +
+          '</div>' +
         '</div>';
 
       root.querySelectorAll('.quiz-option').forEach(function(btn) {

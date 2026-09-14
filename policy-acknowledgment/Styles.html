@@ -1,28 +1,30 @@
 <style>
   /* ============================================================
-     Shared design tokens — swap these once Misk's brand colours
-     and logo are confirmed; nothing else in this file should need
-     to change to re-skin the app.
+     Shared design tokens — --accent* is Misk Schools' brand green,
+     estimated from the logo (fine-tune the hex values below against
+     Misk's brand guideline if you have exact codes). Nothing else in
+     this file should need to change to re-skin the app further.
      ============================================================ */
   :root {
-    --ink: #201f1d;
-    --ink-soft: #5c5a55;
-    --ink-faint: #8a8781;
-    --paper: #faf8f5;
+    --ink: #1c211f;
+    --ink-soft: #55605a;
+    --ink-faint: #8a938c;
+    --paper: #faf9f6;
     --surface: #ffffff;
-    --line: #e7e3db;
-    --line-soft: #f0ede6;
+    --line: #d8e8e0;
+    --line-soft: #eaf3ee;
 
-    /* Placeholder accent — a muted, editorial bronze. Replace with the
-       confirmed Misk brand colour. */
-    --accent: #9c6b30;
-    --accent-ink: #6f4c20;
-    --accent-soft: #f4ebdc;
+    /* Misk Schools green, from the logo mark/wordmark. */
+    --accent: #14966f;
+    --accent-ink: #0b4a38;
+    --accent-soft: #e2f3ec;
 
-    --positive: #3f7a5c;
-    --positive-soft: #e9f2ec;
-    --pending: #8a8781;
-    --pending-soft: #f0ede6;
+    --positive: #1f7a54;
+    --positive-soft: #e4f3ea;
+    --amber: #a9752f;
+    --amber-soft: #f5ede0;
+    --pending: #8a938c;
+    --pending-soft: #eef2f0;
 
     --radius-lg: 16px;
     --radius: 12px;
@@ -51,12 +53,22 @@
   /* ===== Header ===== */
   .app-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 28px 0 20px; border-bottom: 1px solid var(--line);
+    padding: 22px 0 20px; border-bottom: 2px solid var(--accent);
     margin-bottom: 32px; flex-wrap: wrap; gap: 12px;
   }
-  .brand { display: flex; align-items: baseline; gap: 10px; }
-  .brand-mark { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; letter-spacing: 0.01em; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-logo { height: 40px; width: auto; display: block; }
+  .brand-text { display: flex; flex-direction: column; line-height: 1.25; }
+  .brand-mark { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; letter-spacing: 0.01em; color: var(--accent-ink); }
   .brand-sub { color: var(--ink-faint); font-size: 0.86rem; }
+
+  /* ===== Hero banner (dashboard only) ===== */
+  .hero-banner {
+    border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 24px;
+    border: 2px solid var(--accent); box-shadow: var(--shadow-sm);
+  }
+  .hero-banner img { width: 100%; height: 190px; object-fit: cover; display: block; }
+  @media (max-width: 520px) { .hero-banner img { height: 130px; } }
   .app-nav { display: flex; gap: 6px; }
   .nav-link {
     background: none; border: none; cursor: pointer; color: var(--ink-soft);
@@ -101,7 +113,7 @@
     white-space: nowrap;
   }
   .status-done { background: var(--positive-soft); color: var(--positive); }
-  .status-progress { background: var(--accent-soft); color: var(--accent-ink); }
+  .status-progress { background: var(--amber-soft); color: var(--amber); }
   .status-pending { background: var(--pending-soft); color: var(--pending); }
 
   /* ===== Buttons ===== */
@@ -124,19 +136,27 @@
 
   /* ===== PDF viewer / reading gate ===== */
   .viewer-head h1 { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; margin: 0 0 18px; }
-  .dwell-bar { height: 3px; background: var(--line-soft); border-radius: 3px; overflow: hidden; margin-bottom: 18px; }
-  .dwell-bar-fill { height: 100%; width: 0%; background: var(--accent); transition: width 900ms linear; }
-  .viewer-frame {
-    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg);
-    padding: 16px; display: flex; justify-content: center; box-shadow: var(--shadow-sm); margin-bottom: 18px;
+  .progress-bar { height: 4px; background: var(--line-soft); border-radius: 4px; overflow: hidden; margin-bottom: 18px; }
+  .progress-bar-fill { height: 100%; width: 0%; background: var(--accent); transition: width 400ms ease; }
+
+  /* Continuous-scroll PDF: all pages stacked in one scrollable panel so
+     staff can swipe/scroll through naturally instead of paging. */
+  .pdf-scroll {
+    position: relative; max-height: 76vh; overflow-y: auto; overflow-x: hidden;
+    background: var(--surface); border: 2px solid var(--accent); border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm); margin-bottom: 18px; -webkit-overflow-scrolling: touch;
   }
-  .pdf-canvas-wrap { max-width: 100%; }
-  .pdf-canvas-wrap canvas { max-width: 100%; height: auto; border-radius: var(--radius-sm); display: block; }
+  .pdf-page-counter {
+    position: sticky; top: 0; z-index: 2; text-align: center; font-size: 0.8rem; font-weight: 600;
+    color: var(--surface); background: var(--accent); padding: 8px 0; letter-spacing: 0.02em;
+  }
+  .pdf-pages { padding: 22px 16px 32px; display: flex; flex-direction: column; align-items: center; gap: 26px; }
+  .pdf-page canvas { max-width: 100%; height: auto; border-radius: var(--radius-sm); box-shadow: 0 1px 6px rgba(28, 33, 31, 0.14); display: block; }
+
   .viewer-controls {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
   }
   .viewer-controls.single { justify-content: center; }
-  .page-counter { color: var(--ink-soft); font-size: 0.86rem; font-variant-numeric: tabular-nums; }
   .viewer-hint { text-align: center; color: var(--ink-faint); font-size: 0.84rem; margin-top: 14px; }
   .viewer-error { color: var(--ink-soft); padding: 40px 20px; text-align: center; }
 
@@ -145,10 +165,17 @@
   .key-points li { margin-bottom: 12px; font-size: 0.98rem; }
 
   /* ===== Quiz ===== */
-  .quiz-options { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .quiz-wrap { max-width: 640px; margin: 0 auto; }
+  .quiz-wrap .progress-bar { margin-bottom: 26px; }
+  .quiz-question {
+    font-family: var(--font-display); font-size: 1.65rem; font-weight: 600; line-height: 1.35;
+    margin: 8px 0 30px;
+  }
+  .quiz-options { display: flex; flex-direction: column; gap: 14px; }
   .quiz-option {
     text-align: left; background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius);
-    padding: 14px 18px; font-size: 0.96rem; cursor: pointer; transition: border-color var(--transition), background var(--transition);
+    padding: 20px 24px; font-size: 1.08rem; line-height: 1.4; cursor: pointer;
+    transition: border-color var(--transition), background var(--transition);
   }
   .quiz-option:hover { border-color: var(--accent); background: var(--accent-soft); }
 
@@ -161,10 +188,10 @@
   .summary-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
   @media (max-width: 640px) { .summary-cards { grid-template-columns: repeat(2, 1fr); } }
   .summary-card {
-    background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
-    padding: 18px; text-align: left;
+    background: var(--surface); border: 1.5px solid var(--line); border-radius: var(--radius);
+    padding: 18px; text-align: left; border-top: 3px solid var(--accent);
   }
-  .summary-value { font-family: var(--font-display); font-size: 1.8rem; font-weight: 600; }
+  .summary-value { font-family: var(--font-display); font-size: 1.8rem; font-weight: 600; color: var(--accent-ink); }
   .summary-label { color: var(--ink-faint); font-size: 0.8rem; margin-top: 4px; }
   .admin-table-head { margin-bottom: 14px; }
   .filter-input {
@@ -197,7 +224,7 @@
 
   @media (max-width: 520px) {
     .app-shell { padding: 0 14px 64px; }
-    .viewer-controls { justify-content: center; }
-    .viewer-controls .page-counter { order: -1; width: 100%; text-align: center; }
+    .pdf-scroll { max-height: 70vh; }
+    .quiz-question { font-size: 1.35rem; }
   }
 </style>

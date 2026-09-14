@@ -4,12 +4,28 @@
  */
 
 function getPolicyPdfBase64(driveFileId) {
-  var file = DriveApp.getFileById(driveFileId);
+  return getFileBase64_(driveFileId);
+}
+
+function getFileBase64_(fileId) {
+  var file = DriveApp.getFileById(fileId);
   var blob = file.getBlob();
   return {
     base64: Utilities.base64Encode(blob.getBytes()),
     mimeType: blob.getContentType(),
     fileName: file.getName()
+  };
+}
+
+/**
+ * Logo + dashboard hero photo, read from CONFIG.LOGO_FILE_ID /
+ * CONFIG.HERO_IMAGE_FILE_ID. Either can be left blank (returns null for
+ * that one) until you upload the images to Drive and fill in the IDs.
+ */
+function getBrandAssets() {
+  return {
+    logo: CONFIG.LOGO_FILE_ID ? getFileBase64_(CONFIG.LOGO_FILE_ID) : null,
+    hero: CONFIG.HERO_IMAGE_FILE_ID ? getFileBase64_(CONFIG.HERO_IMAGE_FILE_ID) : null
   };
 }
 
