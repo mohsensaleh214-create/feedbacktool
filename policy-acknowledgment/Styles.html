@@ -108,8 +108,11 @@
     padding: 16px 18px; cursor: pointer; transition: border-color var(--transition), box-shadow var(--transition);
   }
   .policy-row:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); }
+  .policy-row-disabled { cursor: not-allowed; opacity: 0.6; }
+  .policy-row-disabled:hover { border-color: var(--line); box-shadow: none; }
   .policy-name { font-weight: 600; font-size: 0.98rem; }
   .policy-meta { color: var(--ink-faint); font-size: 0.8rem; margin-top: 3px; }
+  .policy-meta-warn { color: var(--amber); font-weight: 600; }
   .status-pill {
     flex-shrink: 0; font-size: 0.78rem; font-weight: 600; padding: 5px 12px; border-radius: 999px;
     white-space: nowrap;

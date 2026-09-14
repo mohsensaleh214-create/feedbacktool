@@ -71,6 +71,7 @@
         '</section>';
 
       root.querySelectorAll('[data-policy]').forEach(function(row) {
+        if (row.classList.contains('policy-row-disabled')) return;
         row.addEventListener('click', function() { App.openPolicy(row.getAttribute('data-policy')); });
       });
     },
@@ -79,11 +80,11 @@
       var statusClass = p.status === 'Completed' ? 'status-done' : (p.status === 'In Progress' ? 'status-progress' : 'status-pending');
       var meta = '';
       if (!p.hasFile) {
-        meta = '<div class="policy-meta">Content coming soon</div>';
+        meta = '<div class="policy-meta policy-meta-warn">PDF not uploaded yet — nothing to open</div>';
       } else if (p.lastAcknowledgedVersion && p.status !== 'Completed') {
         meta = '<div class="policy-meta">This policy was updated since you last acknowledged it</div>';
       }
-      return '<div class="policy-row" data-policy="' + p.policyId + '">' +
+      return '<div class="policy-row' + (p.hasFile ? '' : ' policy-row-disabled') + '" data-policy="' + p.policyId + '">' +
         '<div class="policy-row-main">' +
           '<div class="policy-name">' + Utils.escapeHtml(p.name) + '</div>' +
           meta +
@@ -101,6 +102,9 @@
         }
         Utils.run('recordPolicyOpened', [policyId], function() {}, function() {});
         Viewer.open(detail);
+      }, function(err) {
+        Utils.toast('Couldn’t open that policy: ' + (err && err.message ? err.message : 'unknown error'));
+        console.error(err);
       });
     }
   };
