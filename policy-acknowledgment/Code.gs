@@ -32,12 +32,9 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-/** Settings the client needs for the reading gate and quiz, without exposing all of CONFIG. */
+/** Settings the client needs for the quiz, without exposing all of CONFIG. */
 function getAppConfig() {
   return {
-    secondsPerPage: CONFIG.SECONDS_PER_PAGE,
-    minDwellSeconds: CONFIG.MIN_DWELL_SECONDS,
-    maxDwellSeconds: CONFIG.MAX_DWELL_SECONDS,
     quizQuestionsPerAttempt: CONFIG.QUIZ_QUESTIONS_PER_ATTEMPT,
     quizPassMark: CONFIG.QUIZ_PASS_MARK
   };

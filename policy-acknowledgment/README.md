@@ -99,15 +99,14 @@ once (see Setup below) to create these tabs automatically:
   banner at the top of the staff dashboard. Leaving either blank just
   omits that element — no error.
 
-## 5. Reading-gate tuning
+## 5. Reading gate
 
-`CONFIG.SECONDS_PER_PAGE` / `MIN_DWELL_SECONDS` / `MAX_DWELL_SECONDS` in
-`Config.gs` control the dwell timer: required seconds = `pageCount ×
-secondsPerPage`, clamped to `[MIN_DWELL_SECONDS, MAX_DWELL_SECONDS]`.
-Defaults are 22s/page, floor 30s, ceiling 600s (10 min) — adjust to taste.
-Continue also requires having paged through to the document's last page
-(tracked via PDF.js page-render events), so scrolling or an idle tab
-can't satisfy the gate on its own.
+No timer. Staff scroll continuously through the PDF (PDF.js renders every
+page into one scrollable panel); once the last page has scrolled into
+view — detected via an `IntersectionObserver`, a real visibility signal
+rather than a scroll-position guess — the "I have read this policy"
+button unlocks. Clicking it moves Tier 1 policies to key points + the
+check-in quiz, and Tier 2 policies to the one-click declaration.
 
 ## 6. What's intentionally not built yet
 

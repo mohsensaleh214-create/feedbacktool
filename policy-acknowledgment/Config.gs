@@ -17,13 +17,6 @@ var CONFIG = {
   LOGO_FILE_ID: '',
   HERO_IMAGE_FILE_ID: '',
 
-  // Reading-gate dwell timer: seconds required per PDF page, clamped
-  // between a floor and ceiling so very short or very long policies
-  // still get a sane requirement.
-  SECONDS_PER_PAGE: 22,
-  MIN_DWELL_SECONDS: 30,
-  MAX_DWELL_SECONDS: 600,
-
   // Tier 1 check-in quiz
   QUIZ_QUESTIONS_PER_ATTEMPT: 4,
   QUIZ_PASS_MARK: 3,
