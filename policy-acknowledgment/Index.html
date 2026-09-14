@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8" />
+  <?!= include('Styles'); ?>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header id="app-header" class="app-header"></header>
+    <main id="screens">
+      <section id="screen-dashboard" class="screen"></section>
+      <section id="screen-viewer" class="screen" hidden></section>
+      <section id="screen-keypoints" class="screen" hidden></section>
+      <section id="screen-quiz" class="screen" hidden></section>
+      <section id="screen-declaration" class="screen" hidden></section>
+      <section id="screen-admin" class="screen" hidden></section>
+    </main>
+  </div>
+  <div id="toast" class="toast"></div>
+
+  <?!= include('Client_Utils'); ?>
+  <?!= include('Client_App'); ?>
+  <?!= include('Client_Viewer'); ?>
+  <?!= include('Client_Quiz'); ?>
+  <?!= include('Client_Admin'); ?>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    App.init({ email: <?!= JSON.stringify(userEmail) ?>, isAdmin: <?!= JSON.stringify(isAdmin) ?> });
+  </script>
+</body>
+</html>

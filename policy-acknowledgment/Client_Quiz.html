@@ -1,0 +1,119 @@
+<script>
+  var KeyPoints = {
+    open: function(policyDetail) {
+      Utils.showScreen('screen-keypoints');
+      var root = document.getElementById('screen-keypoints');
+      var lines = (policyDetail.keyPoints || '').split('\n').filter(function(l) { return l.trim(); });
+
+      root.innerHTML =
+        '<div class="page-head-narrow"><span class="eyebrow">Key points</span><h1>' + Utils.escapeHtml(policyDetail.name) + '</h1></div>' +
+        (lines.length
+          ? '<ul class="key-points">' + lines.map(function(l) { return '<li>' + Utils.escapeHtml(l.replace(/^[-•]\s*/, '')) + '</li>'; }).join('') + '</ul>'
+          : '<p class="viewer-hint">Key points for this policy haven’t been added yet.</p>') +
+        '<div class="viewer-controls single"><button class="btn btn-primary" id="kp-continue">Continue to check-in</button></div>';
+
+      document.getElementById('kp-continue').addEventListener('click', function() { Quiz.open(policyDetail); });
+    }
+  };
+
+  var Quiz = {
+    policy: null,
+    questions: [],
+    index: 0,
+    answers: [],
+
+    open: function(policyDetail) {
+      if (!policyDetail.quizReady) {
+        Utils.toast('This check-in hasn’t been set up yet.');
+        return;
+      }
+      Quiz.policy = policyDetail;
+      Utils.showScreen('screen-quiz');
+      document.getElementById('screen-quiz').innerHTML = '<div class="loading">Preparing your check-in…</div>';
+      Utils.run('getQuizAttempt', [policyDetail.policyId], function(qs) {
+        Quiz.questions = qs;
+        Quiz.index = 0;
+        Quiz.answers = [];
+        Quiz.renderQuestion();
+      });
+    },
+
+    renderQuestion: function() {
+      var q = Quiz.questions[Quiz.index];
+      var root = document.getElementById('screen-quiz');
+      root.innerHTML =
+        '<div class="page-head-narrow"><span class="eyebrow">Question ' + (Quiz.index + 1) + ' of ' + Quiz.questions.length + '</span>' +
+        '<h1>' + Utils.escapeHtml(q.text) + '</h1></div>' +
+        '<div class="quiz-options">' +
+          q.options.map(function(o) { return '<button class="quiz-option" data-key="' + o.key + '">' + Utils.escapeHtml(o.text) + '</button>'; }).join('') +
+        '</div>';
+
+      root.querySelectorAll('.quiz-option').forEach(function(btn) {
+        btn.addEventListener('click', function() { Quiz.select(q, btn.getAttribute('data-key')); });
+      });
+    },
+
+    select: function(q, key) {
+      Quiz.answers.push({ questionId: q.questionId, selectedKey: key });
+      if (Quiz.index < Quiz.questions.length - 1) {
+        Quiz.index++;
+        Quiz.renderQuestion();
+      } else {
+        Quiz.submit();
+      }
+    },
+
+    submit: function() {
+      document.getElementById('screen-quiz').innerHTML = '<div class="loading">Checking your answers…</div>';
+      Utils.run('gradeQuiz', [Quiz.policy.policyId, Quiz.answers], Quiz.renderResult);
+    },
+
+    renderResult: function(result) {
+      var root = document.getElementById('screen-quiz');
+      if (result.passed) {
+        root.innerHTML =
+          '<div class="result-card result-pass">' +
+            '<span class="eyebrow">Check-in complete</span>' +
+            '<h1>' + result.score + ' of ' + result.total + ' correct</h1>' +
+            '<p>Nicely done — that’s enough to confirm you’ve engaged with this policy.</p>' +
+            '<button class="btn btn-primary" id="quiz-finish">Mark as complete</button>' +
+          '</div>';
+        document.getElementById('quiz-finish').addEventListener('click', function() {
+          Utils.run('submitCompletion', [{ policyId: Quiz.policy.policyId, tier: 1, quizScore: result.score }], function() {
+            Utils.toast('Policy acknowledged.');
+            App.loadDashboard();
+          });
+        });
+      } else {
+        root.innerHTML =
+          '<div class="result-card result-retry">' +
+            '<span class="eyebrow">Check-in</span>' +
+            '<h1>' + result.score + ' of ' + result.total + ' correct</h1>' +
+            '<p>You need ' + App.config.quizPassMark + ' of ' + App.config.quizQuestionsPerAttempt + ' to move on — take another look and try again, no rush.</p>' +
+            '<button class="btn btn-primary" id="quiz-retry">Try again</button>' +
+          '</div>';
+        document.getElementById('quiz-retry').addEventListener('click', function() { Quiz.open(Quiz.policy); });
+      }
+    }
+  };
+
+  var Declaration = {
+    open: function(policyDetail) {
+      Utils.showScreen('screen-declaration');
+      var root = document.getElementById('screen-declaration');
+      root.innerHTML =
+        '<div class="result-card">' +
+          '<span class="eyebrow">Almost done</span>' +
+          '<h1>' + Utils.escapeHtml(policyDetail.name) + '</h1>' +
+          '<p>You’ve read through this policy in full.</p>' +
+          '<button class="btn btn-primary" id="decl-confirm">I have read and understood this policy</button>' +
+        '</div>';
+      document.getElementById('decl-confirm').addEventListener('click', function() {
+        Utils.run('submitCompletion', [{ policyId: policyDetail.policyId, tier: 2 }], function() {
+          Utils.toast('Policy acknowledged.');
+          App.loadDashboard();
+        });
+      });
+    }
+  };
+</script>

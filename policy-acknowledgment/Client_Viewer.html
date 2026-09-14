@@ -1,0 +1,132 @@
+<script>
+  /**
+   * PDF.js viewer with the reading gate. Pages are rendered one at a time
+   * (not a continuous scroll) so "reached the final page" is a real
+   * PDF.js page-change event, not something scroll position could fake.
+   * Continue stays disabled until both the dwell timer and the last-page
+   * visit condition are met.
+   */
+  var Viewer = {
+    pdfDoc: null,
+    pageNum: 1,
+    numPages: 0,
+    reachedLastPage: false,
+    dwellElapsed: 0,
+    dwellRequired: 0,
+    dwellTimer: null,
+
+    open: function(policyDetail) {
+      Utils.showScreen('screen-viewer');
+      var root = document.getElementById('screen-viewer');
+      root.innerHTML =
+        '<div class="viewer-head">' +
+          '<button class="text-btn" id="viewer-back">&larr; Back to dashboard</button>' +
+          '<h1>' + Utils.escapeHtml(policyDetail.name) + '</h1>' +
+        '</div>' +
+        '<div class="dwell-bar"><div class="dwell-bar-fill" id="dwell-fill"></div></div>' +
+        '<div class="viewer-frame"><div class="pdf-canvas-wrap"><canvas id="pdf-canvas"></canvas></div></div>' +
+        '<div class="viewer-controls">' +
+          '<button class="btn btn-outline" id="pdf-prev">Previous</button>' +
+          '<span class="page-counter" id="page-counter">Loading…</span>' +
+          '<button class="btn btn-outline" id="pdf-next">Next</button>' +
+          '<button class="btn btn-primary" id="viewer-continue" disabled>Continue</button>' +
+        '</div>' +
+        '<p class="viewer-hint" id="viewer-hint">Taking a moment to read the whole document unlocks Continue.</p>';
+
+      document.getElementById('viewer-back').addEventListener('click', App.loadDashboard);
+      document.getElementById('pdf-prev').addEventListener('click', function() { Viewer.renderPage(Viewer.pageNum - 1); });
+      document.getElementById('pdf-next').addEventListener('click', function() { Viewer.renderPage(Viewer.pageNum + 1); });
+      document.getElementById('viewer-continue').addEventListener('click', function() { Viewer.continue_(policyDetail); });
+
+      Viewer.reset_();
+      Utils.run('getPolicyPdfBase64', [policyDetail.driveFileId], function(res) { Viewer.load_(res); }, function(err) {
+        document.querySelector('#screen-viewer .viewer-frame').innerHTML =
+          '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
+        console.error(err);
+      });
+    },
+
+    reset_: function() {
+      Viewer.pdfDoc = null;
+      Viewer.pageNum = 1;
+      Viewer.numPages = 0;
+      Viewer.reachedLastPage = false;
+      Viewer.dwellElapsed = 0;
+      Viewer.dwellRequired = 0;
+      if (Viewer.dwellTimer) clearInterval(Viewer.dwellTimer);
+    },
+
+    load_: function(res) {
+      var raw = atob(res.base64);
+      var bytes = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+      pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
+        Viewer.pdfDoc = pdf;
+        Viewer.numPages = pdf.numPages;
+        var perPage = App.config.secondsPerPage;
+        Viewer.dwellRequired = Math.min(
+          App.config.maxDwellSeconds,
+          Math.max(App.config.minDwellSeconds, pdf.numPages * perPage)
+        );
+        Viewer.startDwellTimer_();
+        Viewer.renderPage(1);
+      }).catch(function(err) {
+        document.querySelector('#screen-viewer .viewer-frame').innerHTML =
+          '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
+        console.error(err);
+      });
+    },
+
+    startDwellTimer_: function() {
+      Viewer.dwellTimer = setInterval(function() {
+        Viewer.dwellElapsed++;
+        var fill = document.getElementById('dwell-fill');
+        if (fill) fill.style.width = Math.min(100, Math.round((Viewer.dwellElapsed / Viewer.dwellRequired) * 100)) + '%';
+        Viewer.maybeEnableContinue_();
+      }, 1000);
+    },
+
+    renderPage: function(n) {
+      if (!Viewer.pdfDoc || n < 1 || n > Viewer.numPages) return;
+      Viewer.pageNum = n;
+      Viewer.pdfDoc.getPage(n).then(function(page) {
+        var canvas = document.getElementById('pdf-canvas');
+        var container = canvas.parentElement;
+        var unscaled = page.getViewport({ scale: 1 });
+        var scale = Math.min(1.6, (container.clientWidth - 4) / unscaled.width);
+        var viewport = page.getViewport({ scale: scale > 0 ? scale : 1 });
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+
+        document.getElementById('page-counter').textContent = 'Page ' + n + ' of ' + Viewer.numPages;
+        document.getElementById('pdf-prev').disabled = n <= 1;
+        document.getElementById('pdf-next').disabled = n >= Viewer.numPages;
+
+        if (n === Viewer.numPages) Viewer.reachedLastPage = true;
+        Viewer.maybeEnableContinue_();
+      });
+    },
+
+    maybeEnableContinue_: function() {
+      var btn = document.getElementById('viewer-continue');
+      var hint = document.getElementById('viewer-hint');
+      if (!btn || !hint) return;
+      var ready = Viewer.reachedLastPage && Viewer.dwellElapsed >= Viewer.dwellRequired;
+      btn.disabled = !ready;
+      hint.textContent = ready
+        ? 'You’re ready to continue.'
+        : (Viewer.reachedLastPage ? 'Almost there — just a little more time.' : 'Page through to the end to continue.');
+    },
+
+    continue_: function(policyDetail) {
+      if (Viewer.dwellTimer) clearInterval(Viewer.dwellTimer);
+      if (policyDetail.tier === 1) {
+        KeyPoints.open(policyDetail);
+      } else {
+        Declaration.open(policyDetail);
+      }
+    }
+  };
+</script>
