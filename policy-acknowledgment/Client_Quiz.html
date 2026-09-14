@@ -1,21 +1,4 @@
 <script>
-  var KeyPoints = {
-    open: function(policyDetail) {
-      Utils.showScreen('screen-keypoints');
-      var root = document.getElementById('screen-keypoints');
-      var lines = (policyDetail.keyPoints || '').split('\n').filter(function(l) { return l.trim(); });
-
-      root.innerHTML =
-        '<div class="page-head-narrow"><span class="eyebrow">Key points</span><h1>' + Utils.escapeHtml(policyDetail.name) + '</h1></div>' +
-        (lines.length
-          ? '<ul class="key-points">' + lines.map(function(l) { return '<li>' + Utils.escapeHtml(l.replace(/^[-•]\s*/, '')) + '</li>'; }).join('') + '</ul>'
-          : '<p class="viewer-hint">Key points for this policy haven’t been added yet.</p>') +
-        '<div class="viewer-controls single"><button class="btn btn-primary" id="kp-continue">Continue to check-in</button></div>';
-
-      document.getElementById('kp-continue').addEventListener('click', function() { Quiz.open(policyDetail); });
-    }
-  };
-
   var Quiz = {
     policy: null,
     questions: [],

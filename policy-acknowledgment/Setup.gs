@@ -1,9 +1,9 @@
 /**
  * One-time setup. From the Apps Script editor, select createPolicySystem
  * in the function dropdown and Run. It creates every tab this app needs
- * and seeds Policy Config plus the Tier 1 key points/quiz content
- * supplied so far. Re-running is safe: it only creates tabs that don't
- * exist yet and only seeds rows that aren't already there.
+ * and seeds Policy Config plus the Tier 1 quiz content supplied so far.
+ * Re-running is safe: it only creates tabs that don't exist yet and only
+ * seeds rows that aren't already there.
  *
  * After running:
  *   1. Open the "Policy Config" tab and fill in DriveFileID for each
@@ -24,7 +24,6 @@ function createSheetTabs_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var tabs = [
     { name: CONFIG.SHEET_NAMES.POLICY_CONFIG, headers: ['PolicyID', 'PolicyName', 'Tier', 'DriveFileID', 'CurrentVersionHash', 'Active', 'LastUpdated'] },
-    { name: CONFIG.SHEET_NAMES.KEY_POINTS, headers: ['PolicyID', 'KeyPointsText'] },
     { name: CONFIG.SHEET_NAMES.QUIZ_BANK, headers: ['PolicyID', 'QuestionID', 'QuestionText', 'OptionA', 'OptionB', 'OptionC', 'OptionD', 'CorrectOption'] },
     { name: CONFIG.SHEET_NAMES.ACK_LOG, headers: ['Timestamp', 'StaffEmail', 'StaffName', 'PolicyID', 'PolicyName', 'Tier', 'VersionHash', 'QuizScore', 'Completed'] },
     { name: CONFIG.SHEET_NAMES.STAFF_DIRECTORY, headers: ['StaffEmail', 'StaffName', 'Department', 'Campus', 'LineManagerEmail'] },
@@ -73,15 +72,21 @@ function seedPolicyConfig_() {
 }
 
 /**
- * Tier 1 key points + quiz banks, transcribed from the source document.
- * Review before going live, especially anything with a specific number,
- * threshold, or named role — those are the details most likely to change
- * on the next policy revision. Editing a question afterwards is a normal
- * Sheet edit in "Quiz Bank" — no code changes needed.
+ * Tier 1 quiz banks, transcribed from the source document. There is no
+ * "key points" summary step — Tier 1 goes straight from the PDF reading
+ * gate to this quiz. Each entry below still carries a `keyPoints` array
+ * from the original source material; it's kept only as reference/context
+ * and is never read or shown anywhere — safe to ignore or delete. Review
+ * the quiz questions before going live, especially anything with a
+ * specific number, threshold, or named role — those are the details most
+ * likely to change on the next policy revision. Editing a question
+ * afterwards is a normal Sheet edit in "Quiz Bank" — no code changes
+ * needed.
  *
  * "Behaviour Policy (Junior School)" has no content yet — its bank is
- * left empty and the app shows "content coming soon" for it until rows
- * are added here (or directly in the Sheet) and this function is re-run.
+ * left empty and the check-in is unreachable for it (quizReady stays
+ * false) until rows are added here (or directly in the Sheet) and this
+ * function is re-run.
  *
  * question format: [questionId, text, optionA, optionB, optionC, optionD, correctLetter]
  */
@@ -228,17 +233,11 @@ var TIER1_CONTENT_ = [
 ];
 
 function seedTier1Content_() {
-  var kpSheet = getSheet_(CONFIG.SHEET_NAMES.KEY_POINTS);
-  var kpExisting = sheetToObjects_(kpSheet).map(function(r) { return r.PolicyID; });
-
   var qbSheet = getSheet_(CONFIG.SHEET_NAMES.QUIZ_BANK);
   var qbExisting = {};
   sheetToObjects_(qbSheet).forEach(function(r) { qbExisting[r.PolicyID + '::' + r.QuestionID] = true; });
 
   TIER1_CONTENT_.forEach(function(policy) {
-    if (policy.keyPoints.length && kpExisting.indexOf(policy.id) === -1) {
-      kpSheet.appendRow([policy.id, policy.keyPoints.map(function(p) { return '- ' + p; }).join('\n')]);
-    }
     policy.questions.forEach(function(q) {
       var key = policy.id + '::' + q[0];
       if (qbExisting[key]) return;

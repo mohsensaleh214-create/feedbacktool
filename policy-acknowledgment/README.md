@@ -28,7 +28,10 @@ or by copy-pasting each file into the Apps Script editor.
   and the client decodes it into a `Uint8Array` for
   `pdfjsLib.getDocument({ data })`. This is the reliable pattern for Apps
   Script + Drive + PDF.js — a direct client-side `fetch()` against a Drive
-  URL will intermittently fail on auth/CORS.
+  URL will intermittently fail on auth/CORS. Pages render lazily (only the
+  page near the viewport actually rasterizes, via `IntersectionObserver`)
+  rather than all at once, so opening a long document doesn't stall on
+  rendering every page before showing anything.
 - **Data backend**: Google Sheets, one tab per concern (see schema below).
   Nothing policy-specific is hardcoded — tiers, content, and quiz
   questions all come from the Sheet, so tuning them later is a spreadsheet
@@ -49,7 +52,6 @@ once (see Setup below) to create these tabs automatically:
 | Tab | Columns | Purpose |
 |---|---|---|
 | **Policy Config** | PolicyID, PolicyName, Tier, DriveFileID, CurrentVersionHash, Active, LastUpdated | One row per policy. `DriveFileID` and `CurrentVersionHash` start blank — you fill in the Drive file ID once PDFs are uploaded, then run `syncPolicyVersions()`. |
-| **Key Points** | PolicyID, KeyPointsText | Tier 1 only. One row per policy; `KeyPointsText` is newline-separated bullets. |
 | **Quiz Bank** | PolicyID, QuestionID, QuestionText, OptionA, OptionB, OptionC, OptionD, CorrectOption | Tier 1 only. One row per question; a policy can have more than 4 so the app can draw a random 4 each attempt. Edit/add rows directly in the Sheet — no code changes needed. |
 | **Acknowledgment Log** | Timestamp, StaffEmail, StaffName, PolicyID, PolicyName, Tier, VersionHash, QuizScore, Completed | Append-only. One row per completion event. Never edit or delete existing rows — this is the audit trail. |
 | **Staff Directory** | StaffEmail, StaffName, Department, Campus, LineManagerEmail | Populate manually (or sync from your directory later). Drives the admin dashboard's per-staff view and reminder emails. `LineManagerEmail` is a placeholder column for the escalation hook — unused until you define that logic. |
@@ -73,18 +75,19 @@ once (see Setup below) to create these tabs automatically:
 
 ## 4. Content status
 
-- **Tier 1 key points + quiz banks**: seeded from the source document for
-  7 of 8 policies. **Behaviour Policy (Junior School)** has no content
-  yet — its entry in `Setup.gs`'s `TIER1_CONTENT_` is intentionally empty,
-  and the app shows "content coming soon" for it in the meantime. Add its
-  key points and questions to that array (or directly into the Key
-  Points / Quiz Bank tabs) once you have them.
+- **No key-points step.** Tier 1 goes straight from the PDF reading gate
+  to the check-in quiz — no AI-written summary is shown to staff.
+- **Tier 1 quiz banks**: seeded from the source document for 7 of 8
+  policies. **Behaviour Policy (Junior School)** has no content yet — its
+  entry in `Setup.gs`'s `TIER1_CONTENT_` has an empty `questions` array,
+  so `quizReady` is false for it and the check-in is unreachable until
+  questions are added there (or directly into the Quiz Bank tab).
 - **Every quiz question was drawn directly from the source policy text.**
   Review before going live — especially anything citing a specific
   number, threshold, or named role, since those are the details most
   likely to drift on the next policy revision.
 - **Tier 2 policies**: config rows exist (`Setup.gs`'s `POLICIES_`), but
-  they only need a Drive file — no key points or quiz.
+  they only need a Drive file — no quiz.
 - **PDFs**: no files are bundled in this repo. Upload each policy's PDF to
   Drive and fill in its `DriveFileID` per the deployment steps above.
 - **Brand colours**: `Styles.html` uses Misk Schools green (`--accent`,
@@ -108,7 +111,7 @@ No timer. Staff scroll continuously through the PDF (PDF.js renders every
 page into one scrollable panel); once the last page has scrolled into
 view — detected via an `IntersectionObserver`, a real visibility signal
 rather than a scroll-position guess — the "I have read this policy"
-button unlocks. Clicking it moves Tier 1 policies to key points + the
+button unlocks. Clicking it moves Tier 1 policies straight to the
 check-in quiz, and Tier 2 policies to the one-click declaration.
 
 ## 6. What's intentionally not built yet

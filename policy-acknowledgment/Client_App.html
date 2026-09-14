@@ -4,6 +4,7 @@
     config: null,
     assets: {},
     currentPolicy: null,
+    loading: false,
 
     init: function(user) {
       App.user = user;
@@ -62,7 +63,7 @@
           '<p class="page-sub">' + done + ' of ' + total + ' acknowledged</p>' +
         '</div>' +
         '<section class="tier-block">' +
-          '<h2 class="tier-title">Tier 1 <span class="tier-note">Key points + a short check-in</span></h2>' +
+          '<h2 class="tier-title">Tier 1 <span class="tier-note">Read the policy, then a short check-in</span></h2>' +
           '<div class="policy-list">' + data.tier1.map(App.policyRow).join('') + '</div>' +
         '</section>' +
         '<section class="tier-block">' +
@@ -94,17 +95,30 @@
     },
 
     openPolicy: function(policyId) {
+      if (App.loading) return;
+      App.loading = true;
+
+      // Navigate away from the dashboard immediately so a click always has
+      // visible, instant feedback instead of appearing to do nothing while
+      // the server call is in flight.
+      Utils.showScreen('screen-viewer');
+      document.getElementById('screen-viewer').innerHTML = '<div class="loading">Opening policy…</div>';
+
       Utils.run('getPolicyDetail', [policyId], function(detail) {
+        App.loading = false;
         App.currentPolicy = detail;
         if (!detail.hasFile) {
           Utils.toast('This policy’s document hasn’t been added yet.');
+          App.loadDashboard();
           return;
         }
         Utils.run('recordPolicyOpened', [policyId], function() {}, function() {});
         Viewer.open(detail);
       }, function(err) {
+        App.loading = false;
         Utils.toast('Couldn’t open that policy: ' + (err && err.message ? err.message : 'unknown error'));
         console.error(err);
+        App.loadDashboard();
       });
     }
   };

@@ -1,7 +1,7 @@
 /**
  * Central configuration for the Misk Schools Policy Acknowledgment System.
- * Everything policy-specific (names, tiers, key points, quiz questions)
- * lives in the bound Sheet, not here — this file only holds settings that
+ * Everything policy-specific (names, tiers, quiz questions) lives in the
+ * bound Sheet, not here — this file only holds settings that
  * are genuinely code-level: domain, admin list, and gate timing.
  */
 
@@ -32,7 +32,6 @@ var CONFIG = {
 
   SHEET_NAMES: {
     POLICY_CONFIG: 'Policy Config',
-    KEY_POINTS: 'Key Points',
     QUIZ_BANK: 'Quiz Bank',
     ACK_LOG: 'Acknowledgment Log',
     STAFF_DIRECTORY: 'Staff Directory',

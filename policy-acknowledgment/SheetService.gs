@@ -39,12 +39,6 @@ function getPolicyConfig_() {
     .filter(function(p) { return String(p.Active).toUpperCase() !== 'FALSE'; });
 }
 
-function getKeyPoints_(policyId) {
-  var rows = sheetToObjects_(getSheet_(CONFIG.SHEET_NAMES.KEY_POINTS));
-  var match = rows.filter(function(r) { return r.PolicyID === policyId; })[0];
-  return match ? match.KeyPointsText : '';
-}
-
 function getQuizBank_(policyId) {
   return sheetToObjects_(getSheet_(CONFIG.SHEET_NAMES.QUIZ_BANK))
     .filter(function(r) { return r.PolicyID === policyId; });

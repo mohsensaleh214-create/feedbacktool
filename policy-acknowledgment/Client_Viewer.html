@@ -1,11 +1,13 @@
 <script>
   /**
-   * PDF.js viewer with the reading gate. All pages render into one
-   * continuously scrollable panel (swipe/scroll like a normal document)
-   * at device-pixel-ratio-aware resolution so text stays sharp. "I have
-   * read this policy" unlocks once the last page has scrolled into view
-   * (a real IntersectionObserver visibility signal, not a scroll-position
-   * guess) — no timer, no minimum wait.
+   * PDF.js viewer with the reading gate. All pages get a placeholder slot
+   * immediately (so the scrollbar/layout is correct and page 1 shows fast),
+   * but only the page currently near the viewport actually rasterizes —
+   * lazy rendering via IntersectionObserver, not a Promise.all over every
+   * page up front, which is what made longer documents slow to open.
+   * "I have read this policy" unlocks once the last page has scrolled into
+   * view (a real visibility signal, not a scroll-position guess) — no
+   * timer, no minimum wait.
    */
   var Viewer = {
     pdfDoc: null,
@@ -13,6 +15,8 @@
     reachedLastPage: false,
     observer: null,
     pageEls: [],
+    pageMeta: {},
+    rendered: {},
 
     open: function(policyDetail) {
       Utils.showScreen('screen-viewer');
@@ -24,7 +28,7 @@
         '</div>' +
         '<div class="pdf-scroll" id="pdf-scroll">' +
           '<div class="pdf-page-counter" id="page-counter">Loading…</div>' +
-          '<div class="pdf-pages" id="pdf-pages"></div>' +
+          '<div class="pdf-pages" id="pdf-pages"><div class="loading">Opening document…</div></div>' +
         '</div>' +
         '<div class="viewer-controls single">' +
           '<button class="btn btn-primary" id="viewer-continue" disabled>I have read this policy</button>' +
@@ -46,6 +50,8 @@
       Viewer.numPages = 0;
       Viewer.reachedLastPage = false;
       Viewer.pageEls = [];
+      Viewer.pageMeta = {};
+      Viewer.rendered = {};
       if (Viewer.observer) Viewer.observer.disconnect();
     },
 
@@ -57,55 +63,72 @@
       pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
         Viewer.pdfDoc = pdf;
         Viewer.numPages = pdf.numPages;
-        Viewer.renderAllPages_();
+        Viewer.layoutPages_();
       }).catch(function(err) {
         document.getElementById('pdf-pages').innerHTML = '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
         console.error(err);
       });
     },
 
-    /** Renders every page up front at a device-pixel-ratio-aware scale so text stays crisp when the container is fairly wide. */
-    renderAllPages_: function() {
+    /**
+     * Reads each page's dimensions (cheap — no rasterizing) so every page
+     * gets a correctly-sized placeholder up front, then renders only page 1
+     * immediately. The rest render lazily as they approach the viewport.
+     */
+    layoutPages_: function() {
       var container = document.getElementById('pdf-pages');
-      container.innerHTML = '';
-      Viewer.pageEls = [];
-
       var dpr = window.devicePixelRatio || 1;
       var containerWidth = document.getElementById('pdf-scroll').clientWidth - 32;
-      var renderPromises = [];
+      var metaPromises = [];
 
       for (var n = 1; n <= Viewer.numPages; n++) {
         (function(pageNum) {
-          renderPromises.push(
+          metaPromises.push(
             Viewer.pdfDoc.getPage(pageNum).then(function(page) {
-              var wrap = document.createElement('div');
-              wrap.className = 'pdf-page';
-              wrap.setAttribute('data-page', pageNum);
-              var canvas = document.createElement('canvas');
-              wrap.appendChild(canvas);
-              container.appendChild(wrap);
-              Viewer.pageEls.push(wrap);
-
               var unscaled = page.getViewport({ scale: 1 });
               var targetWidth = Math.min(880, containerWidth > 0 ? containerWidth : 700);
               var scale = (targetWidth / unscaled.width) * dpr;
               var viewport = page.getViewport({ scale: scale });
+
+              var wrap = document.createElement('div');
+              wrap.className = 'pdf-page';
+              wrap.setAttribute('data-page', pageNum);
+              wrap.style.width = (viewport.width / dpr) + 'px';
+              wrap.style.height = (viewport.height / dpr) + 'px';
+
+              var canvas = document.createElement('canvas');
               canvas.width = viewport.width;
               canvas.height = viewport.height;
               canvas.style.width = (viewport.width / dpr) + 'px';
               canvas.style.height = (viewport.height / dpr) + 'px';
+              wrap.appendChild(canvas);
 
-              return page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport }).promise;
+              Viewer.pageMeta[pageNum] = { page: page, viewport: viewport, canvas: canvas };
+              return wrap;
             })
           );
         })(n);
       }
 
-      Promise.all(renderPromises).then(function() {
+      Promise.all(metaPromises).then(function(wraps) {
+        container.innerHTML = '';
+        Viewer.pageEls = wraps;
+        wraps.forEach(function(wrap) { container.appendChild(wrap); });
+
         var counter = document.getElementById('page-counter');
         if (counter) counter.textContent = 'Page 1 of ' + Viewer.numPages;
+
+        Viewer.renderPage_(1);
         Viewer.watchPages_();
       });
+    },
+
+    renderPage_: function(pageNum) {
+      if (Viewer.rendered[pageNum]) return;
+      var meta = Viewer.pageMeta[pageNum];
+      if (!meta) return;
+      Viewer.rendered[pageNum] = true;
+      meta.page.render({ canvasContext: meta.canvas.getContext('2d'), viewport: meta.viewport });
     },
 
     watchPages_: function() {
@@ -115,8 +138,12 @@
 
       Viewer.observer = new IntersectionObserver(function(entries) {
         entries.forEach(function(entry) {
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
-            var pageNum = Number(entry.target.getAttribute('data-page'));
+          var pageNum = Number(entry.target.getAttribute('data-page'));
+          if (!entry.isIntersecting) return;
+
+          Viewer.renderPage_(pageNum);
+
+          if (entry.intersectionRatio > 0.5) {
             counter.textContent = 'Page ' + pageNum + ' of ' + Viewer.numPages;
             if (pageNum === Viewer.numPages) {
               Viewer.reachedLastPage = true;
@@ -124,7 +151,7 @@
             }
           }
         });
-      }, { root: scrollRoot, threshold: [0.5] });
+      }, { root: scrollRoot, rootMargin: '600px 0px', threshold: [0, 0.5] });
 
       Viewer.pageEls.forEach(function(el) { Viewer.observer.observe(el); });
     },
@@ -142,7 +169,7 @@
     continue_: function(policyDetail) {
       if (Viewer.observer) Viewer.observer.disconnect();
       if (policyDetail.tier === 1) {
-        KeyPoints.open(policyDetail);
+        Quiz.open(policyDetail);
       } else {
         Declaration.open(policyDetail);
       }

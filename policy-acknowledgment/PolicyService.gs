@@ -63,8 +63,6 @@ function getPolicyDetail(policyId) {
   };
 
   if (tier === 1) {
-    detail.keyPoints = getKeyPoints_(policyId);
-    detail.keyPointsReady = !!detail.keyPoints;
     detail.quizReady = getQuizBank_(policyId).length >= CONFIG.QUIZ_QUESTIONS_PER_ATTEMPT;
   }
 
