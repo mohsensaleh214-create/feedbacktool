@@ -56,11 +56,13 @@
     padding: 22px 0 20px; border-bottom: 2px solid var(--accent);
     margin-bottom: 32px; flex-wrap: wrap; gap: 12px;
   }
-  .brand { display: flex; align-items: center; gap: 12px; }
-  .brand-logo { height: 40px; width: auto; display: block; }
-  .brand-text { display: flex; flex-direction: column; line-height: 1.25; }
-  .brand-mark { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; letter-spacing: 0.01em; color: var(--accent-ink); }
-  .brand-sub { color: var(--ink-faint); font-size: 0.86rem; }
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .brand-logo { height: 52px; width: auto; display: block; }
+  .brand-sub {
+    color: var(--ink-faint); font-size: 0.86rem; padding-left: 16px;
+    border-left: 1px solid var(--line);
+  }
+  @media (max-width: 480px) { .brand-logo { height: 40px; } .brand-sub { display: none; } }
 
   /* ===== Hero banner (dashboard only) ===== */
   .hero-banner {

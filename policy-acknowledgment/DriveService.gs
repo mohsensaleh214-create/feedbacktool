@@ -18,13 +18,14 @@ function getFileBase64_(fileId) {
 }
 
 /**
- * Logo + dashboard hero photo, read from CONFIG.LOGO_FILE_ID /
- * CONFIG.HERO_IMAGE_FILE_ID. Either can be left blank (returns null for
- * that one) until you upload the images to Drive and fill in the IDs.
+ * Dashboard hero photo, read from CONFIG.HERO_IMAGE_FILE_ID. Left blank
+ * until a campus photo is uploaded to Drive and its ID pasted in. (The
+ * logo itself is baked into Assets.html as BRAND_LOGO_DATA_URI — no
+ * Drive round-trip needed for something that only changes when the code
+ * is redeployed anyway.)
  */
 function getBrandAssets() {
   return {
-    logo: CONFIG.LOGO_FILE_ID ? getFileBase64_(CONFIG.LOGO_FILE_ID) : null,
     hero: CONFIG.HERO_IMAGE_FILE_ID ? getFileBase64_(CONFIG.HERO_IMAGE_FILE_ID) : null
   };
 }

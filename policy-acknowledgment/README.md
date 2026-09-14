@@ -69,7 +69,7 @@ once (see Setup below) to create these tabs automatically:
 7. Run `installWeeklyReminderTrigger` (from `Setup.gs`) to turn on the weekly outstanding-policy reminder email.
 8. **Deploy → New deployment → Web app**. Execute as **Me**, access **Anyone within [your domain]** — this matches `appsscript.json`'s `webapp` block.
 9. Update `CONFIG.ALLOWED_DOMAIN` in `Config.gs` if it isn't already `miskschools.edu.sa`, and confirm `CONFIG.ADMIN_EMAILS` lists everyone who should see the admin dashboard.
-10. Optional: upload the Misk logo and a campus photo to Drive, then paste their file IDs into `CONFIG.LOGO_FILE_ID` / `CONFIG.HERO_IMAGE_FILE_ID` in `Config.gs` (see "Logo + hero photo" below).
+10. The Misk logo is already baked into `Assets.html` — nothing to configure. Optional: upload a campus photo to Drive and paste its file ID into `CONFIG.HERO_IMAGE_FILE_ID` in `Config.gs` for the dashboard banner.
 
 ## 4. Content status
 
@@ -92,12 +92,15 @@ once (see Setup below) to create these tabs automatically:
   the file), estimated from the logo. Fine-tune those three hex values
   against Misk's brand guideline if you have exact codes — nothing else
   needs to change.
-- **Logo + hero photo**: set `CONFIG.LOGO_FILE_ID` and
-  `CONFIG.HERO_IMAGE_FILE_ID` in `Config.gs` to Drive file IDs (same
+- **Logo**: baked directly into `Assets.html` as `BRAND_LOGO_DATA_URI`
+  (the actual Misk Schools logo, not a placeholder) — no Drive fetch or
+  config needed. To swap it later, replace that file's base64 string
+  with a new one (`base64 -i new-logo.png` and paste the output in).
+- **Hero photo**: still Drive-based since none was supplied — set
+  `CONFIG.HERO_IMAGE_FILE_ID` in `Config.gs` to a Drive file ID (same
   "upload to Drive, copy the ID from the share link" pattern as the
-  policy PDFs). The logo shows in the header; the hero photo shows as a
-  banner at the top of the staff dashboard. Leaving either blank just
-  omits that element — no error.
+  policy PDFs) to show a campus photo banner atop the staff dashboard.
+  Left blank, the banner just doesn't render — no error.
 
 ## 5. Reading gate
 

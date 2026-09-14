@@ -9,12 +9,14 @@ var CONFIG = {
   // Restrict sign-in to this Workspace domain. Update to Misk's real domain.
   ALLOWED_DOMAIN: 'miskschools.edu.sa',
 
-  // Emails allowed to view the admin dashboard.
-  ADMIN_EMAILS: ['mohsensaleh214@gmail.com'],
+  // Emails allowed to view the admin dashboard. Must be @ALLOWED_DOMAIN
+  // addresses — sign-in is blocked for anything outside that domain, so a
+  // personal email here would never actually be reachable.
+  ADMIN_EMAILS: ['msaleh@miskschools.edu.sa'],
 
-  // Drive file IDs for branding images (upload to Drive, paste the ID from
-  // the share link). Left blank shows the text wordmark / no hero banner.
-  LOGO_FILE_ID: '',
+  // Drive file ID for the dashboard hero photo (upload to Drive, paste the
+  // ID from the share link). Left blank shows no hero banner. The logo
+  // itself is baked into Assets.html, not fetched from Drive.
   HERO_IMAGE_FILE_ID: '',
 
   // Tier 1 check-in quiz
