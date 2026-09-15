@@ -12,6 +12,19 @@
       }
       Quiz.policy = policyDetail;
       Utils.showScreen('screen-quiz');
+
+      // Viewer speculatively fetches the quiz while the policy is still
+      // being read, so it's usually already here — no round-trip needed.
+      if (Viewer.prefetchedQuiz && Viewer.prefetchedQuizPolicyId === policyDetail.policyId) {
+        var qs = Viewer.prefetchedQuiz;
+        Viewer.prefetchedQuiz = null; // a retake should get a freshly shuffled set, not this one again
+        Quiz.questions = qs;
+        Quiz.index = 0;
+        Quiz.answers = [];
+        Quiz.renderQuestion();
+        return;
+      }
+
       document.getElementById('screen-quiz').innerHTML = '<div class="loading">Preparing your check-in…</div>';
       Utils.run('getQuizAttempt', [policyDetail.policyId], function(qs) {
         Quiz.questions = qs;
@@ -66,9 +79,10 @@
             '<button class="btn btn-primary" id="quiz-finish">Mark as complete</button>' +
           '</div>';
         document.getElementById('quiz-finish').addEventListener('click', function() {
-          Utils.run('submitCompletion', [{ policyId: Quiz.policy.policyId, tier: 1, quizScore: result.score }], function() {
+          Utils.run('submitCompletion', [{ policyId: Quiz.policy.policyId, tier: 1, quizScore: result.score }], function(dashboardData) {
             Utils.toast('Policy acknowledged.');
-            App.loadDashboard();
+            Utils.showScreen('screen-dashboard');
+            App.renderDashboard(dashboardData);
           });
         });
       } else {
@@ -96,9 +110,10 @@
           '<button class="btn btn-primary" id="decl-confirm">I have read and understood this policy</button>' +
         '</div>';
       document.getElementById('decl-confirm').addEventListener('click', function() {
-        Utils.run('submitCompletion', [{ policyId: policyDetail.policyId, tier: 2 }], function() {
+        Utils.run('submitCompletion', [{ policyId: policyDetail.policyId, tier: 2 }], function(dashboardData) {
           Utils.toast('Policy acknowledged.');
-          App.loadDashboard();
+          Utils.showScreen('screen-dashboard');
+          App.renderDashboard(dashboardData);
         });
       });
     }

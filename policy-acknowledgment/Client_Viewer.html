@@ -17,6 +17,8 @@
     pageEls: [],
     pageMeta: {},
     rendered: {},
+    prefetchedQuiz: null,
+    prefetchedQuizPolicyId: null,
 
     open: function(policyDetail) {
       Utils.showScreen('screen-viewer');
@@ -39,10 +41,22 @@
       document.getElementById('viewer-continue').addEventListener('click', function() { Viewer.continue_(policyDetail); });
 
       Viewer.reset_();
-      Utils.run('getPolicyPdfBase64', [policyDetail.driveFileId], function(res) { Viewer.load_(res); }, function(err) {
+
+      if (policyDetail.pdf) {
+        Viewer.load_(policyDetail.pdf);
+      } else {
         document.getElementById('pdf-pages').innerHTML = '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
-        console.error(err);
-      });
+      }
+
+      // Fetch the Tier 1 quiz in the background while they're still
+      // reading, so clicking "I have read this policy" usually finds it
+      // already there instead of triggering its own round-trip.
+      if (policyDetail.tier === 1 && policyDetail.quizReady) {
+        Viewer.prefetchedQuizPolicyId = policyDetail.policyId;
+        Utils.run('getQuizAttempt', [policyDetail.policyId], function(qs) {
+          if (Viewer.prefetchedQuizPolicyId === policyDetail.policyId) Viewer.prefetchedQuiz = qs;
+        }, function(err) { console.error(err); /* Quiz.open will just fetch normally */ });
+      }
     },
 
     reset_: function() {
@@ -52,6 +66,8 @@
       Viewer.pageEls = [];
       Viewer.pageMeta = {};
       Viewer.rendered = {};
+      Viewer.prefetchedQuiz = null;
+      Viewer.prefetchedQuizPolicyId = null;
       if (Viewer.observer) Viewer.observer.disconnect();
     },
 

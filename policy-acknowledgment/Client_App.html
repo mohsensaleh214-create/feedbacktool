@@ -5,21 +5,26 @@
     assets: {},
     currentPolicy: null,
     loading: false,
+    lastDashboardData: null,
 
     init: function(user) {
       App.user = user;
-      Utils.run('getAppConfig', [], function(cfg) {
-        App.config = cfg;
-        Utils.run('getBrandAssets', [], function(assets) {
-          App.assets = assets || {};
-          App.renderHeader();
-          App.loadDashboard();
-        }, function() {
-          App.assets = {};
-          App.renderHeader();
-          App.loadDashboard();
-        });
-      });
+
+      // The logo is a baked-in constant (no server call needed), so the
+      // header and the dashboard's own data fetch can both start
+      // immediately instead of waiting on config/assets first. Config and
+      // brand assets load in the background in parallel — nothing on the
+      // critical path blocks on them.
+      App.renderHeader();
+      App.loadDashboard();
+
+      Utils.run('getAppConfig', [], function(cfg) { App.config = cfg; }, function(err) { console.error(err); });
+      Utils.run('getBrandAssets', [], function(assets) {
+        App.assets = assets || {};
+        if (App.lastDashboardData && !document.getElementById('screen-dashboard').hidden) {
+          App.renderDashboard(App.lastDashboardData);
+        }
+      }, function() { App.assets = {}; });
     },
 
     renderHeader: function() {
@@ -49,6 +54,7 @@
     },
 
     renderDashboard: function(data) {
+      App.lastDashboardData = data;
       var root = document.getElementById('screen-dashboard');
       var total = data.tier1.length + data.tier2.length;
       var done = data.tier1.concat(data.tier2).filter(function(p) { return p.status === 'Completed'; }).length;

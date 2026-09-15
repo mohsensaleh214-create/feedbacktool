@@ -22,16 +22,17 @@ or by copy-pasting each file into the Apps Script editor.
   about.
 - **PDF viewer**: the client never fetches the Drive file directly (Drive
   doesn't reliably serve permissive CORS headers, and the file needs an
-  authenticated request anyway). Instead: `Client_Viewer.html` calls
-  `google.script.run.getPolicyPdfBase64(driveFileId)`, `DriveService.gs`
-  reads the file server-side with `DriveApp` and returns it base64-encoded,
-  and the client decodes it into a `Uint8Array` for
-  `pdfjsLib.getDocument({ data })`. This is the reliable pattern for Apps
-  Script + Drive + PDF.js — a direct client-side `fetch()` against a Drive
-  URL will intermittently fail on auth/CORS. Pages render lazily (only the
-  page near the viewport actually rasterizes, via `IntersectionObserver`)
-  rather than all at once, so opening a long document doesn't stall on
-  rendering every page before showing anything.
+  authenticated request anyway). Instead: `getPolicyDetail(policyId)`
+  reads the file server-side with `DriveApp` and returns it
+  base64-encoded *inline with the policy's metadata* (one round-trip, not
+  two — see Performance below), and the client decodes it into a
+  `Uint8Array` for `pdfjsLib.getDocument({ data })`. This is the reliable
+  pattern for Apps Script + Drive + PDF.js — a direct client-side
+  `fetch()` against a Drive URL will intermittently fail on auth/CORS.
+  Pages render lazily (only the page near the viewport actually
+  rasterizes, via `IntersectionObserver`) rather than all at once, so
+  opening a long document doesn't stall on rendering every page before
+  showing anything.
 - **Data backend**: Google Sheets, one tab per concern (see schema below).
   Nothing policy-specific is hardcoded — tiers, content, and quiz
   questions all come from the Sheet, so tuning them later is a spreadsheet
@@ -114,7 +115,36 @@ rather than a scroll-position guess — the "I have read this policy"
 button unlocks. Clicking it moves Tier 1 policies straight to the
 check-in quiz, and Tier 2 policies to the one-click declaration.
 
-## 6. What's intentionally not built yet
+## 6. Performance
+
+Apps Script has real per-call overhead (`google.script.run` isn't free,
+even for tiny payloads), so the main lever is *how many round-trips*
+a given action makes, not micro-optimizing any single one:
+
+- **Initial load**: `App.init()` fires the dashboard data request
+  immediately rather than waiting on config/brand-asset calls first
+  (those load in the background and patch in once they arrive). The
+  header renders instantly — the logo is a baked-in constant
+  (`Assets.html`), not a server call.
+- **Opening a policy**: `getPolicyDetail()` returns the PDF inline
+  instead of the client making a second call for it — one round-trip,
+  not two.
+- **Taking the quiz**: `Viewer.open()` fetches the quiz attempt in the
+  background as soon as a Tier 1 policy opens, while the PDF is still
+  being read. By the time "I have read this policy" is clicked, the quiz
+  is usually already there.
+- **Finishing**: `submitCompletion()` already recomputes and returns the
+  fresh dashboard data as part of writing the completion row — the
+  quiz/declaration success handlers render that directly instead of
+  calling `loadDashboard()` again, which would re-fetch the same data a
+  second time.
+
+If it's still slow after these, the next suspect is PDF file size — the
+whole file is base64-encoded and sent over the wire before rendering can
+start, so a large scanned PDF (many MB) will be slower to open than a
+lean exported one, no matter how the round-trips are arranged.
+
+## 7. What's intentionally not built yet
 
 Per the brief, the escalation-to-line-manager logic is a placeholder:
 `escalateToManager_()` in `ReminderService.gs` fires past

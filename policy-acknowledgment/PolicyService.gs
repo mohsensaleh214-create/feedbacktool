@@ -48,6 +48,13 @@ function getDashboardData() {
   return { email: email, tier1: grouped[1] || [], tier2: grouped[2] || [] };
 }
 
+/**
+ * Includes the PDF itself (base64) when the policy has one, rather than
+ * making the client fetch it in a second round-trip — opening a policy
+ * always needs both immediately, so there's nothing to save by splitting
+ * them, and Apps Script's per-call overhead makes two round-trips
+ * noticeably slower than one.
+ */
 function getPolicyDetail(policyId) {
   var policy = getPolicyConfig_().filter(function(p) { return p.PolicyID === policyId; })[0];
   if (!policy) throw new Error('Unknown policy: ' + policyId);
@@ -61,6 +68,10 @@ function getPolicyDetail(policyId) {
     versionHash: policy.CurrentVersionHash,
     hasFile: !!policy.DriveFileID
   };
+
+  if (detail.hasFile) {
+    detail.pdf = getFileBase64_(policy.DriveFileID);
+  }
 
   if (tier === 1) {
     detail.quizReady = getQuizBank_(policyId).length >= CONFIG.QUIZ_QUESTIONS_PER_ATTEMPT;
