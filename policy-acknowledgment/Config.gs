@@ -19,6 +19,13 @@ var CONFIG = {
   // itself is baked into Assets.html, not fetched from Drive.
   HERO_IMAGE_FILE_ID: '',
 
+  // Once IT sets up a branded short link (e.g. policies.miskschools.edu.sa)
+  // redirecting to the raw script.google.com deployment URL, put it here —
+  // reminder emails (and anywhere else the app links to itself) will use
+  // this instead of the long, unmemorable Apps Script URL. Leave blank to
+  // fall back to ScriptApp.getService().getUrl().
+  PUBLIC_URL: '',
+
   // Tier 1 check-in quiz
   QUIZ_QUESTIONS_PER_ATTEMPT: 4,
   QUIZ_PASS_MARK: 3,

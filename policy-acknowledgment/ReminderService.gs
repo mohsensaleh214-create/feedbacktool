@@ -36,7 +36,7 @@ function sendOutstandingReminders() {
 }
 
 function sendReminderEmail_(person, outstanding) {
-  var appUrl = ScriptApp.getService().getUrl();
+  var appUrl = CONFIG.PUBLIC_URL || ScriptApp.getService().getUrl();
   var list = outstanding.map(function(p) { return '- ' + p.PolicyName; }).join('\n');
   var body = 'Hi ' + (person.StaffName || '') + ',\n\n' +
     'The following Misk Schools policies still need your acknowledgment:\n\n' + list +
