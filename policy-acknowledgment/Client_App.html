@@ -1,0 +1,131 @@
+<script>
+  var App = {
+    user: null,
+    config: null,
+    assets: {},
+    currentPolicy: null,
+    loading: false,
+    lastDashboardData: null,
+
+    init: function(user) {
+      App.user = user;
+
+      // The logo is a baked-in constant (no server call needed), so the
+      // header and the dashboard's own data fetch can both start
+      // immediately instead of waiting on config/assets first. Config and
+      // brand assets load in the background in parallel — nothing on the
+      // critical path blocks on them.
+      App.renderHeader();
+      App.loadDashboard();
+
+      Utils.run('getAppConfig', [], function(cfg) { App.config = cfg; }, function(err) { console.error(err); });
+      Utils.run('getBrandAssets', [], function(assets) {
+        App.assets = assets || {};
+        if (App.lastDashboardData && !document.getElementById('screen-dashboard').hidden) {
+          App.renderDashboard(App.lastDashboardData);
+        }
+      }, function() { App.assets = {}; });
+    },
+
+    renderHeader: function() {
+      var header = document.getElementById('app-header');
+      header.innerHTML =
+        '<div class="brand">' +
+          '<img class="brand-logo" src="' + BRAND_LOGO_DATA_URI + '" alt="Misk Schools" />' +
+          '<span class="brand-sub">Policy Acknowledgment</span>' +
+        '</div>' +
+        '<nav class="app-nav">' +
+          '<button class="nav-link" data-nav="dashboard">Dashboard</button>' +
+          (App.user.isAdmin ? '<button class="nav-link" data-nav="admin">Admin</button>' : '') +
+        '</nav>';
+      header.querySelectorAll('[data-nav]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var nav = btn.getAttribute('data-nav');
+          if (nav === 'dashboard') App.loadDashboard();
+          if (nav === 'admin') Admin.load();
+        });
+      });
+    },
+
+    loadDashboard: function() {
+      Utils.showScreen('screen-dashboard');
+      document.getElementById('screen-dashboard').innerHTML = '<div class="loading">Loading your policies…</div>';
+      Utils.run('getDashboardData', [], App.renderDashboard);
+    },
+
+    renderDashboard: function(data) {
+      App.lastDashboardData = data;
+      var root = document.getElementById('screen-dashboard');
+      var total = data.tier1.length + data.tier2.length;
+      var done = data.tier1.concat(data.tier2).filter(function(p) { return p.status === 'Completed'; }).length;
+      var hero = (App.assets && App.assets.hero)
+        ? '<div class="hero-banner"><img src="data:' + App.assets.hero.mimeType + ';base64,' + App.assets.hero.base64 + '" alt="Misk Schools campus" /></div>'
+        : '';
+
+      root.innerHTML =
+        hero +
+        '<div class="page-head">' +
+          '<h1>Your policies</h1>' +
+          '<p class="page-sub">' + done + ' of ' + total + ' acknowledged</p>' +
+        '</div>' +
+        '<section class="tier-block">' +
+          '<h2 class="tier-title">Tier 1 <span class="tier-note">Read the policy, then a short check-in</span></h2>' +
+          '<div class="policy-list">' + data.tier1.map(App.policyRow).join('') + '</div>' +
+        '</section>' +
+        '<section class="tier-block">' +
+          '<h2 class="tier-title">Tier 2 <span class="tier-note">Read &amp; acknowledge</span></h2>' +
+          '<div class="policy-list">' + data.tier2.map(App.policyRow).join('') + '</div>' +
+        '</section>';
+
+      root.querySelectorAll('[data-policy]').forEach(function(row) {
+        if (row.classList.contains('policy-row-disabled')) return;
+        row.addEventListener('click', function() { App.openPolicy(row.getAttribute('data-policy')); });
+      });
+    },
+
+    policyRow: function(p) {
+      var statusClass = p.status === 'Completed' ? 'status-done' : (p.status === 'In Progress' ? 'status-progress' : 'status-pending');
+      var meta = '';
+      if (!p.hasFile) {
+        meta = '<div class="policy-meta policy-meta-warn">PDF not uploaded yet — nothing to open</div>';
+      } else if (p.lastAcknowledgedVersion && p.status !== 'Completed') {
+        meta = '<div class="policy-meta">This policy was updated since you last acknowledged it</div>';
+      }
+      return '<div class="policy-row' + (p.hasFile ? '' : ' policy-row-disabled') + '" data-policy="' + p.policyId + '">' +
+        '<div class="policy-row-main">' +
+          '<div class="policy-name">' + Utils.escapeHtml(p.name) + '</div>' +
+          meta +
+        '</div>' +
+        '<span class="status-pill ' + statusClass + '">' + p.status + '</span>' +
+      '</div>';
+    },
+
+    openPolicy: function(policyId) {
+      if (App.loading) return;
+      App.loading = true;
+
+      // Navigate away from the dashboard immediately so a click always has
+      // visible, instant feedback instead of appearing to do nothing while
+      // the server call is in flight.
+      Utils.showScreen('screen-viewer');
+      document.getElementById('screen-viewer').innerHTML = '<div class="loading">Opening policy…</div>';
+
+      Utils.run('getPolicyDetail', [policyId], function(detail) {
+        App.loading = false;
+        App.currentPolicy = detail;
+        if (!detail.hasFile) {
+          Utils.toast('This policy’s document hasn’t been added yet.');
+          App.loadDashboard();
+          return;
+        }
+        Utils.run('recordPolicyOpened', [policyId], function() {}, function() {});
+        Viewer.open(detail);
+      }, function(err) {
+        App.loading = false;
+        Utils.toast('Couldn’t open that policy: ' + (err && err.message ? err.message : 'unknown error'));
+        console.error(err);
+        App.loadDashboard();
+      });
+    }
+  };
+</script>

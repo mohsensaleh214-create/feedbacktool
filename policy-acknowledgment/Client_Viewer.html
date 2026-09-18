@@ -1,0 +1,194 @@
+<script>
+  /**
+   * PDF.js viewer with the reading gate. All pages get a placeholder slot
+   * immediately (so the scrollbar/layout is correct and page 1 shows fast),
+   * but only the page currently near the viewport actually rasterizes —
+   * lazy rendering via IntersectionObserver, not a Promise.all over every
+   * page up front, which is what made longer documents slow to open.
+   * "I have read this policy" unlocks once the last page has scrolled into
+   * view (a real visibility signal, not a scroll-position guess) — no
+   * timer, no minimum wait.
+   */
+  var Viewer = {
+    pdfDoc: null,
+    numPages: 0,
+    reachedLastPage: false,
+    observer: null,
+    pageEls: [],
+    pageMeta: {},
+    rendered: {},
+    prefetchedQuiz: null,
+    prefetchedQuizPolicyId: null,
+
+    open: function(policyDetail) {
+      Utils.showScreen('screen-viewer');
+      var root = document.getElementById('screen-viewer');
+      root.innerHTML =
+        '<div class="viewer-head">' +
+          '<button class="text-btn" id="viewer-back">&larr; Back to dashboard</button>' +
+          '<h1>' + Utils.escapeHtml(policyDetail.name) + '</h1>' +
+        '</div>' +
+        '<div class="pdf-scroll" id="pdf-scroll">' +
+          '<div class="pdf-page-counter" id="page-counter">Loading…</div>' +
+          '<div class="pdf-pages" id="pdf-pages"><div class="loading">Opening document…</div></div>' +
+        '</div>' +
+        '<div class="viewer-controls single">' +
+          '<button class="btn btn-primary" id="viewer-continue" disabled>I have read this policy</button>' +
+        '</div>' +
+        '<p class="viewer-hint" id="viewer-hint">Scroll all the way through to unlock this.</p>';
+
+      document.getElementById('viewer-back').addEventListener('click', App.loadDashboard);
+      document.getElementById('viewer-continue').addEventListener('click', function() { Viewer.continue_(policyDetail); });
+
+      Viewer.reset_();
+
+      if (policyDetail.pdf) {
+        Viewer.load_(policyDetail.pdf);
+      } else {
+        document.getElementById('pdf-pages').innerHTML = '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
+      }
+
+      // Fetch the Tier 1 quiz in the background while they're still
+      // reading, so clicking "I have read this policy" usually finds it
+      // already there instead of triggering its own round-trip.
+      if (policyDetail.tier === 1 && policyDetail.quizReady) {
+        Viewer.prefetchedQuizPolicyId = policyDetail.policyId;
+        Utils.run('getQuizAttempt', [policyDetail.policyId], function(qs) {
+          if (Viewer.prefetchedQuizPolicyId === policyDetail.policyId) Viewer.prefetchedQuiz = qs;
+        }, function(err) { console.error(err); /* Quiz.open will just fetch normally */ });
+      }
+    },
+
+    reset_: function() {
+      Viewer.pdfDoc = null;
+      Viewer.numPages = 0;
+      Viewer.reachedLastPage = false;
+      Viewer.pageEls = [];
+      Viewer.pageMeta = {};
+      Viewer.rendered = {};
+      Viewer.prefetchedQuiz = null;
+      Viewer.prefetchedQuizPolicyId = null;
+      if (Viewer.observer) Viewer.observer.disconnect();
+    },
+
+    load_: function(res) {
+      var raw = atob(res.base64);
+      var bytes = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+      pdfjsLib.getDocument({ data: bytes }).promise.then(function(pdf) {
+        Viewer.pdfDoc = pdf;
+        Viewer.numPages = pdf.numPages;
+        Viewer.layoutPages_();
+      }).catch(function(err) {
+        document.getElementById('pdf-pages').innerHTML = '<p class="viewer-error">This document couldn’t be loaded. Please try again shortly.</p>';
+        console.error(err);
+      });
+    },
+
+    /**
+     * Reads each page's dimensions (cheap — no rasterizing) so every page
+     * gets a correctly-sized placeholder up front, then renders only page 1
+     * immediately. The rest render lazily as they approach the viewport.
+     */
+    layoutPages_: function() {
+      var container = document.getElementById('pdf-pages');
+      var dpr = window.devicePixelRatio || 1;
+      var containerWidth = document.getElementById('pdf-scroll').clientWidth - 32;
+      var metaPromises = [];
+
+      for (var n = 1; n <= Viewer.numPages; n++) {
+        (function(pageNum) {
+          metaPromises.push(
+            Viewer.pdfDoc.getPage(pageNum).then(function(page) {
+              var unscaled = page.getViewport({ scale: 1 });
+              var targetWidth = Math.min(880, containerWidth > 0 ? containerWidth : 700);
+              var scale = (targetWidth / unscaled.width) * dpr;
+              var viewport = page.getViewport({ scale: scale });
+
+              var wrap = document.createElement('div');
+              wrap.className = 'pdf-page';
+              wrap.setAttribute('data-page', pageNum);
+              wrap.style.width = (viewport.width / dpr) + 'px';
+              wrap.style.height = (viewport.height / dpr) + 'px';
+
+              var canvas = document.createElement('canvas');
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+              canvas.style.width = (viewport.width / dpr) + 'px';
+              canvas.style.height = (viewport.height / dpr) + 'px';
+              wrap.appendChild(canvas);
+
+              Viewer.pageMeta[pageNum] = { page: page, viewport: viewport, canvas: canvas };
+              return wrap;
+            })
+          );
+        })(n);
+      }
+
+      Promise.all(metaPromises).then(function(wraps) {
+        container.innerHTML = '';
+        Viewer.pageEls = wraps;
+        wraps.forEach(function(wrap) { container.appendChild(wrap); });
+
+        var counter = document.getElementById('page-counter');
+        if (counter) counter.textContent = 'Page 1 of ' + Viewer.numPages;
+
+        Viewer.renderPage_(1);
+        Viewer.watchPages_();
+      });
+    },
+
+    renderPage_: function(pageNum) {
+      if (Viewer.rendered[pageNum]) return;
+      var meta = Viewer.pageMeta[pageNum];
+      if (!meta) return;
+      Viewer.rendered[pageNum] = true;
+      meta.page.render({ canvasContext: meta.canvas.getContext('2d'), viewport: meta.viewport });
+    },
+
+    watchPages_: function() {
+      var counter = document.getElementById('page-counter');
+      var scrollRoot = document.getElementById('pdf-scroll');
+      if (!counter || !scrollRoot) return;
+
+      Viewer.observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry) {
+          var pageNum = Number(entry.target.getAttribute('data-page'));
+          if (!entry.isIntersecting) return;
+
+          Viewer.renderPage_(pageNum);
+
+          if (entry.intersectionRatio > 0.5) {
+            counter.textContent = 'Page ' + pageNum + ' of ' + Viewer.numPages;
+            if (pageNum === Viewer.numPages) {
+              Viewer.reachedLastPage = true;
+              Viewer.maybeEnableContinue_();
+            }
+          }
+        });
+      }, { root: scrollRoot, rootMargin: '600px 0px', threshold: [0, 0.5] });
+
+      Viewer.pageEls.forEach(function(el) { Viewer.observer.observe(el); });
+    },
+
+    maybeEnableContinue_: function() {
+      var btn = document.getElementById('viewer-continue');
+      var hint = document.getElementById('viewer-hint');
+      if (!btn || !hint) return;
+      btn.disabled = !Viewer.reachedLastPage;
+      hint.textContent = Viewer.reachedLastPage
+        ? 'You’re ready to continue.'
+        : 'Scroll all the way through to unlock this.';
+    },
+
+    continue_: function(policyDetail) {
+      if (Viewer.observer) Viewer.observer.disconnect();
+      if (policyDetail.tier === 1) {
+        Quiz.open(policyDetail);
+      } else {
+        Declaration.open(policyDetail);
+      }
+    }
+  };
+</script>

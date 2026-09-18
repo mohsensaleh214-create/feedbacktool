@@ -1,0 +1,75 @@
+<script>
+  var Admin = {
+    data: null,
+    filter: '',
+    sortKey: 'name',
+    sortDir: 1,
+
+    load: function() {
+      Utils.showScreen('screen-admin');
+      document.getElementById('screen-admin').innerHTML = '<div class="loading">Loading dashboard…</div>';
+      Utils.run('getAdminDashboardData', [], function(data) { Admin.data = data; Admin.render(); });
+    },
+
+    render: function() {
+      var d = Admin.data;
+      var root = document.getElementById('screen-admin');
+      root.innerHTML =
+        '<div class="page-head"><h1>Admin dashboard</h1></div>' +
+        '<div class="summary-cards">' +
+          Admin.card('Overall completion', d.summary.overallCompletion + '%') +
+          Admin.card('Outstanding acknowledgments', d.summary.totalOutstanding) +
+          Admin.card('Staff', d.summary.staffCount) +
+          Admin.card('Policies', d.summary.policyCount) +
+        '</div>' +
+        '<div class="admin-table-head"><input type="text" id="admin-filter" class="filter-input" placeholder="Filter by name, email, or department" /></div>' +
+        '<div class="table-scroll"><table class="admin-table"><thead><tr>' +
+          '<th data-sort="name">Staff</th><th data-sort="department">Department</th><th data-sort="campus">Campus</th>' +
+          '<th data-sort="completionRate">Completion</th><th>Outstanding</th>' +
+        '</tr></thead><tbody id="admin-tbody"></tbody></table></div>';
+
+      document.getElementById('admin-filter').addEventListener('input', function(e) {
+        Admin.filter = e.target.value.toLowerCase();
+        Admin.renderRows();
+      });
+      root.querySelectorAll('[data-sort]').forEach(function(th) {
+        th.addEventListener('click', function() {
+          var key = th.getAttribute('data-sort');
+          Admin.sortDir = (Admin.sortKey === key) ? -Admin.sortDir : 1;
+          Admin.sortKey = key;
+          Admin.renderRows();
+        });
+      });
+      Admin.renderRows();
+    },
+
+    card: function(label, value) {
+      return '<div class="summary-card"><div class="summary-value">' + value + '</div><div class="summary-label">' + label + '</div></div>';
+    },
+
+    renderRows: function() {
+      var rows = Admin.data.byStaff.filter(function(s) {
+        if (!Admin.filter) return true;
+        return (s.name + s.email + s.department + s.campus).toLowerCase().indexOf(Admin.filter) !== -1;
+      }).sort(function(a, b) {
+        var av = a[Admin.sortKey], bv = b[Admin.sortKey];
+        if (av < bv) return -1 * Admin.sortDir;
+        if (av > bv) return 1 * Admin.sortDir;
+        return 0;
+      });
+
+      document.getElementById('admin-tbody').innerHTML = rows.map(function(s) {
+        var outstanding = s.outstanding.length
+          ? s.outstanding.map(function(o) { return Utils.escapeHtml(o.name) + ' (' + o.daysOutstanding + 'd)'; }).join(', ')
+          : '<span class="all-done">All caught up</span>';
+        return '<tr>' +
+          '<td><div>' + Utils.escapeHtml(s.name || s.email) + '</div><div class="cell-sub">' + Utils.escapeHtml(s.email) + '</div></td>' +
+          '<td>' + Utils.escapeHtml(s.department) + '</td>' +
+          '<td>' + Utils.escapeHtml(s.campus) + '</td>' +
+          '<td>' + s.completionRate + '%</td>' +
+          '<td class="outstanding-cell">' + outstanding + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+  };
+</script>

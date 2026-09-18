@@ -1,0 +1,35 @@
+<script>
+  var Utils = {
+    run: function(fnName, args, onSuccess, onError) {
+      var call = google.script.run
+        .withSuccessHandler(onSuccess)
+        .withFailureHandler(onError || Utils.defaultError);
+      call[fnName].apply(call, args || []);
+    },
+
+    defaultError: function(err) {
+      console.error(err);
+      Utils.toast((err && err.message) ? err.message : 'Something went wrong. Please try again.');
+    },
+
+    toast: function(msg) {
+      var t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(Utils._toastTimer);
+      Utils._toastTimer = setTimeout(function() { t.classList.remove('show'); }, 3200);
+    },
+
+    showScreen: function(id) {
+      document.querySelectorAll('.screen').forEach(function(s) { s.hidden = true; });
+      document.getElementById(id).hidden = false;
+      window.scrollTo(0, 0);
+    },
+
+    escapeHtml: function(str) {
+      var div = document.createElement('div');
+      div.textContent = str === null || str === undefined ? '' : String(str);
+      return div.innerHTML;
+    }
+  };
+</script>

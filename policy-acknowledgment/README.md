@@ -1,0 +1,153 @@
+# Misk Schools Policy Acknowledgment System
+
+A Google Apps Script web app that replaces manual QR/Adobe sign-off for
+staff acknowledgment of "Must Read" policies. Staff sign in with their
+Misk Schools Google account, read each policy's PDF rendered in-app
+(PDF.js), pass a reading gate, and either take a short check-in quiz
+(Tier 1) or make a one-click declaration (Tier 2). Google Sheets is the
+data store; there's no separate hosting or license cost.
+
+This folder is a plain source checkout — it isn't wired to a live Apps
+Script project yet. Deploy it with [`clasp`](https://github.com/google/clasp)
+or by copy-pasting each file into the Apps Script editor.
+
+## 1. Architecture at a glance
+
+- **Auth**: `Session.getActiveUser().getEmail()`, domain-restricted in
+  `Code.gs` (`CONFIG.ALLOWED_DOMAIN`). No separate login system.
+- **Rendering**: single-page app. `doGet` always serves `Index.html`;
+  everything after that (dashboard, PDF viewer, quiz, admin) is
+  client-side routing via `Utils.showScreen()` — no URL params, no page
+  reloads, so the reading-gate/quiz state machine stays simple to reason
+  about.
+- **PDF viewer**: the client never fetches the Drive file directly (Drive
+  doesn't reliably serve permissive CORS headers, and the file needs an
+  authenticated request anyway). Instead: `getPolicyDetail(policyId)`
+  reads the file server-side with `DriveApp` and returns it
+  base64-encoded *inline with the policy's metadata* (one round-trip, not
+  two — see Performance below), and the client decodes it into a
+  `Uint8Array` for `pdfjsLib.getDocument({ data })`. This is the reliable
+  pattern for Apps Script + Drive + PDF.js — a direct client-side
+  `fetch()` against a Drive URL will intermittently fail on auth/CORS.
+  Pages render lazily (only the page near the viewport actually
+  rasterizes, via `IntersectionObserver`) rather than all at once, so
+  opening a long document doesn't stall on rendering every page before
+  showing anything.
+- **Data backend**: Google Sheets, one tab per concern (see schema below).
+  Nothing policy-specific is hardcoded — tiers, content, and quiz
+  questions all come from the Sheet, so tuning them later is a spreadsheet
+  edit, not a code change.
+- **Versioning**: each policy's Drive file is MD5-hashed
+  (`syncPolicyVersions()` in `DriveService.gs`). A staff member's
+  completion only counts while their acknowledged `VersionHash` matches
+  the policy's current one — replace the PDF, re-run
+  `syncPolicyVersions()`, and everyone's status quietly reverts to
+  outstanding. The Acknowledgment Log is append-only, so history is never
+  lost.
+
+## 2. Sheet schema
+
+Bind this script to a new Google Sheet, then run `createPolicySystem()`
+once (see Setup below) to create these tabs automatically:
+
+| Tab | Columns | Purpose |
+|---|---|---|
+| **Policy Config** | PolicyID, PolicyName, Tier, DriveFileID, CurrentVersionHash, Active, LastUpdated | One row per policy. `DriveFileID` and `CurrentVersionHash` start blank — you fill in the Drive file ID once PDFs are uploaded, then run `syncPolicyVersions()`. |
+| **Quiz Bank** | PolicyID, QuestionID, QuestionText, OptionA, OptionB, OptionC, OptionD, CorrectOption | Tier 1 only. One row per question; a policy can have more than 4 so the app can draw a random 4 each attempt. Edit/add rows directly in the Sheet — no code changes needed. |
+| **Acknowledgment Log** | Timestamp, StaffEmail, StaffName, PolicyID, PolicyName, Tier, VersionHash, QuizScore, Completed | Append-only. One row per completion event. Never edit or delete existing rows — this is the audit trail. |
+| **Staff Directory** | StaffEmail, StaffName, Department, Campus, LineManagerEmail | Populate manually (or sync from your directory later). Drives the admin dashboard's per-staff view and reminder emails. `LineManagerEmail` is a placeholder column for the escalation hook — unused until you define that logic. |
+| **Progress Tracker** | StaffEmail, PolicyID, VersionHash, LastOpenedAt | Internal. Upserted when a staff member opens a policy, so the dashboard can show "In Progress" vs "Not Started" without touching the append-only log. |
+| **Reminder Log** | Timestamp, StaffEmail, PolicyIDs, Type, DaysOutstanding | Internal. Records each reminder email sent and each time the (placeholder) escalation hook fires. |
+
+## 3. Deployment
+
+1. Create a new Google Sheet — this becomes the data backend.
+2. In the Sheet, **Extensions → Apps Script**, and either:
+   - use `clasp`: `clasp create --type sheets --rootDir ./policy-acknowledgment` pointed at this folder, then `clasp push`, or
+   - manually create each file in the Apps Script editor and paste in the matching content from this folder (match filenames exactly, including the `.gs`/`.html` split).
+3. In the Apps Script editor, run `createPolicySystem` (from `Setup.gs`) once. Authorize the requested scopes when prompted.
+4. Open the **Policy Config** tab and paste each policy's Drive file ID into `DriveFileID` (the ID segment of its Drive share link).
+5. Run `syncPolicyVersions` once to compute each file's initial hash.
+6. Open **Staff Directory** and add each staff member's email (Department/Campus/LineManagerEmail can stay blank for now — they're there for you to fill in as that data becomes available).
+7. Run `installWeeklyReminderTrigger` (from `Setup.gs`) to turn on the weekly outstanding-policy reminder email.
+8. **Deploy → New deployment → Web app**. Execute as **Me**, access **Anyone within [your domain]** — this matches `appsscript.json`'s `webapp` block.
+9. Update `CONFIG.ALLOWED_DOMAIN` in `Config.gs` if it isn't already `miskschools.edu.sa`, and confirm `CONFIG.ADMIN_EMAILS` lists everyone who should see the admin dashboard.
+10. The Misk logo is already baked into `Assets.html` — nothing to configure. Optional: upload a campus photo to Drive and paste its file ID into `CONFIG.HERO_IMAGE_FILE_ID` in `Config.gs` for the dashboard banner.
+
+## 4. Content status
+
+- **No key-points step.** Tier 1 goes straight from the PDF reading gate
+  to the check-in quiz — no AI-written summary is shown to staff.
+- **Tier 1 quiz banks**: seeded from the source document for 7 of 8
+  policies. **Behaviour Policy (Junior School)** has no content yet — its
+  entry in `Setup.gs`'s `TIER1_CONTENT_` has an empty `questions` array,
+  so `quizReady` is false for it and the check-in is unreachable until
+  questions are added there (or directly into the Quiz Bank tab).
+- **Every quiz question was drawn directly from the source policy text.**
+  Review before going live — especially anything citing a specific
+  number, threshold, or named role, since those are the details most
+  likely to drift on the next policy revision.
+- **Tier 2 policies**: config rows exist (`Setup.gs`'s `POLICIES_`), but
+  they only need a Drive file — no quiz.
+- **PDFs**: no files are bundled in this repo. Upload each policy's PDF to
+  Drive and fill in its `DriveFileID` per the deployment steps above.
+- **Brand colours**: `Styles.html` uses Misk Schools green (`--accent`,
+  `--accent-ink`, `--accent-soft` CSS custom properties near the top of
+  the file), estimated from the logo. Fine-tune those three hex values
+  against Misk's brand guideline if you have exact codes — nothing else
+  needs to change.
+- **Logo**: baked directly into `Assets.html` as `BRAND_LOGO_DATA_URI`
+  (the actual Misk Schools logo, not a placeholder) — no Drive fetch or
+  config needed. To swap it later, replace that file's base64 string
+  with a new one (`base64 -i new-logo.png` and paste the output in).
+- **Hero photo**: still Drive-based since none was supplied — set
+  `CONFIG.HERO_IMAGE_FILE_ID` in `Config.gs` to a Drive file ID (same
+  "upload to Drive, copy the ID from the share link" pattern as the
+  policy PDFs) to show a campus photo banner atop the staff dashboard.
+  Left blank, the banner just doesn't render — no error.
+
+## 5. Reading gate
+
+No timer. Staff scroll continuously through the PDF (PDF.js renders every
+page into one scrollable panel); once the last page has scrolled into
+view — detected via an `IntersectionObserver`, a real visibility signal
+rather than a scroll-position guess — the "I have read this policy"
+button unlocks. Clicking it moves Tier 1 policies straight to the
+check-in quiz, and Tier 2 policies to the one-click declaration.
+
+## 6. Performance
+
+Apps Script has real per-call overhead (`google.script.run` isn't free,
+even for tiny payloads), so the main lever is *how many round-trips*
+a given action makes, not micro-optimizing any single one:
+
+- **Initial load**: `App.init()` fires the dashboard data request
+  immediately rather than waiting on config/brand-asset calls first
+  (those load in the background and patch in once they arrive). The
+  header renders instantly — the logo is a baked-in constant
+  (`Assets.html`), not a server call.
+- **Opening a policy**: `getPolicyDetail()` returns the PDF inline
+  instead of the client making a second call for it — one round-trip,
+  not two.
+- **Taking the quiz**: `Viewer.open()` fetches the quiz attempt in the
+  background as soon as a Tier 1 policy opens, while the PDF is still
+  being read. By the time "I have read this policy" is clicked, the quiz
+  is usually already there.
+- **Finishing**: `submitCompletion()` already recomputes and returns the
+  fresh dashboard data as part of writing the completion row — the
+  quiz/declaration success handlers render that directly instead of
+  calling `loadDashboard()` again, which would re-fetch the same data a
+  second time.
+
+If it's still slow after these, the next suspect is PDF file size — the
+whole file is base64-encoded and sent over the wire before rendering can
+start, so a large scanned PDF (many MB) will be slower to open than a
+lean exported one, no matter how the round-trips are arranged.
+
+## 7. What's intentionally not built yet
+
+Per the brief, the escalation-to-line-manager logic is a placeholder:
+`escalateToManager_()` in `ReminderService.gs` fires past
+`CONFIG.ESCALATION_THRESHOLD_DAYS` outstanding but only logs to the
+Reminder Log — it doesn't CC anyone yet. `Staff Directory`'s
+`LineManagerEmail` column is reserved for when that's defined.
