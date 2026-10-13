@@ -1,0 +1,51 @@
+name: Build Murmur (Mac app)
+
+on:
+  push:
+    paths:
+      - "Murmur/**"
+      - ".github/workflows/build-murmur.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: Murmur
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Build the app
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          chmod +x scripts/build-app.sh
+          ./scripts/build-app.sh
+
+      - name: Upload the app (download it from this run's Summary page)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Murmur
+          path: Murmur/build/Murmur.zip
+          if-no-files-found: error
+
+      - name: Publish as the "latest build" on the Releases page
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete murmur-latest --cleanup-tag --yes || true
+          gh release create murmur-latest build/Murmur.zip \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Murmur — latest build" \
+            --notes "Built from \`${GITHUB_REF_NAME}\` (build ${{ github.run_number }}). Download **Murmur.zip** below, then follow the install steps in Murmur/README.md."

@@ -1,0 +1,5 @@
+Murmur/.build/
+Murmur/build/
+Murmur/.swiftpm/
+Murmur/Package.resolved
+.DS_Store
