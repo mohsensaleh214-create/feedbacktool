@@ -1,7 +1,7 @@
 import AppKit
 
 @main
-struct MurmurApp {
+struct MiskScribeApp {
     @MainActor
     static func main() {
         let app = NSApplication.shared

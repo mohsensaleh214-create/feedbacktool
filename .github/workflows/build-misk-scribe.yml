@@ -1,10 +1,10 @@
-name: Build Murmur (Mac app)
+name: Build Misk Scribe (Mac app)
 
 on:
   push:
     paths:
-      - "Murmur/**"
-      - ".github/workflows/build-murmur.yml"
+      - "MiskScribe/**"
+      - ".github/workflows/build-misk-scribe.yml"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +15,7 @@ jobs:
     runs-on: macos-26
     defaults:
       run:
-        working-directory: Murmur
+        working-directory: MiskScribe
     steps:
       - uses: actions/checkout@v4
 
@@ -35,17 +35,18 @@ jobs:
       - name: Upload the app (download it from this run's Summary page)
         uses: actions/upload-artifact@v4
         with:
-          name: Murmur
-          path: Murmur/build/Murmur.zip
+          name: Misk-Scribe
+          path: MiskScribe/build/Misk-Scribe.zip
           if-no-files-found: error
 
       - name: Publish as the "latest build" on the Releases page
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete murmur-latest --cleanup-tag --yes || true
-          gh release create murmur-latest build/Murmur.zip \
+          gh release delete murmur-latest --cleanup-tag --yes || true  # old placeholder name
+          gh release delete misk-scribe-latest --cleanup-tag --yes || true
+          gh release create misk-scribe-latest build/Misk-Scribe.zip \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Murmur — latest build" \
-            --notes "Built from \`${GITHUB_REF_NAME}\` (build ${{ github.run_number }}). Download **Murmur.zip** below, then follow the install steps in Murmur/README.md."
+            --title "Misk Scribe — latest build" \
+            --notes "Built from \`${GITHUB_REF_NAME}\` (build ${{ github.run_number }}). Download **Misk-Scribe.zip** below, then follow the install steps in MiskScribe/README.md."

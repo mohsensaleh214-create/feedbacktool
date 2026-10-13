@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "Murmur",
+    name: "MiskScribe",
     platforms: [
         .macOS(.v14)
     ],
@@ -12,11 +12,11 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "Murmur",
+            name: "MiskScribe",
             dependencies: [
                 .product(name: "WhisperKit", package: "argmax-oss-swift")
             ],
-            path: "Sources/Murmur"
+            path: "Sources/MiskScribe"
         )
     ]
 )

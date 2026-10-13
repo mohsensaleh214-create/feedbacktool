@@ -80,24 +80,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .ready:
             break
         case .loading:
-            hud.flash("Still getting ready — downloading the speech model…")
+            hud.flash("Getting ready — downloading the speech model…")
             return
         case .failed:
-            hud.flash("\(Brand.name) couldn't load. Open the menu bar icon for details.")
+            hud.flash("\(Brand.name) couldn't start — click its menu bar icon.")
             return
         case .recording, .transcribing:
             return
         }
 
         guard Permissions.microphoneAllowed else {
-            hud.flash("\(Brand.name) needs microphone access — see the menu bar icon.")
+            hud.flash("Allow microphone access — click the menu bar icon.")
             return
         }
 
         do {
             try recorder.start()
             state = .recording(startedAt: Date())
-            hud.show("Listening…", color: .systemRed)
+            hud.showListening { [recorder] in recorder.currentLevel }
         } catch {
             hud.flash(error.localizedDescription, seconds: 4)
         }
@@ -116,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         state = .transcribing
-        hud.show("Transcribing…", color: .systemOrange)
+        hud.showTranscribing()
 
         Task {
             defer { state = .ready }
@@ -128,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
                 deliver(text + " ")
             } catch {
-                hud.flash("Sorry, that didn't work: \(error.localizedDescription)", seconds: 4)
+                hud.flash("Sorry, that didn't work. Please try again.", seconds: 3)
             }
         }
     }
@@ -139,7 +139,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             hud.hide()
         } else {
             inserter.copy(text)
-            hud.flash("Copied — press ⌘V to paste. (Allow Accessibility to paste automatically.)", seconds: 4)
+            hud.flash("Copied — press ⌘V to paste", seconds: 3)
         }
     }
 
@@ -160,14 +160,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         button.image = image
     }
 
-    /// Rebuilt every time the menu opens, so permission ticks are always current.
+    /// Rebuilt every time the menu opens, so it always reflects the current state.
+    /// Kept deliberately short: permission items only appear when something
+    /// still needs allowing.
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        menu.addItem(disabledItem("\(Brand.name) — \(statusText)"))
-        menu.addItem(disabledItem("Hold \(hotkey.trigger.title) and speak, then let go."))
-        menu.addItem(.separator())
+        menu.addItem(disabledItem(statusText))
 
+        if !Permissions.microphoneAllowed || !Permissions.accessibilityAllowed {
+            menu.addItem(.separator())
+            if !Permissions.microphoneAllowed {
+                menu.addItem(actionItem("Allow Microphone…", #selector(openMicrophoneSettings)))
+            }
+            if !Permissions.accessibilityAllowed {
+                menu.addItem(actionItem("Allow Accessibility…", #selector(openAccessibilitySettings)))
+            }
+        }
+
+        if case .failed = state {
+            menu.addItem(.separator())
+            menu.addItem(actionItem("Try Again", #selector(retryLoad)))
+        }
+
+        menu.addItem(.separator())
         let keyMenu = NSMenu()
         for key in TriggerKey.allCases {
             let item = NSMenuItem(title: key.title, action: #selector(chooseTrigger(_:)), keyEquivalent: "")
@@ -176,40 +192,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             item.state = key == hotkey.trigger ? .on : .off
             keyMenu.addItem(item)
         }
-        let keyItem = NSMenuItem(title: "Push-to-talk key", action: nil, keyEquivalent: "")
+        let keyItem = NSMenuItem(title: "Shortcut", action: nil, keyEquivalent: "")
         keyItem.submenu = keyMenu
         menu.addItem(keyItem)
-        menu.addItem(.separator())
-
-        menu.addItem(disabledItem("Permissions"))
-        menu.addItem(permissionItem(
-            allowed: Permissions.microphoneAllowed,
-            name: "Microphone",
-            action: #selector(openMicrophoneSettings)
-        ))
-        menu.addItem(permissionItem(
-            allowed: Permissions.accessibilityAllowed,
-            name: "Accessibility",
-            action: #selector(openAccessibilitySettings)
-        ))
-
-        if case .failed = state {
-            menu.addItem(.separator())
-            menu.addItem(actionItem("Try Loading Again", #selector(retryLoad)))
-        }
-
-        menu.addItem(.separator())
         menu.addItem(actionItem("About \(Brand.name)", #selector(showAbout)))
-        menu.addItem(actionItem("Quit \(Brand.name)", #selector(quit), key: "q"))
+        menu.addItem(actionItem("Quit", #selector(quit), key: "q"))
     }
 
     private var statusText: String {
         switch state {
-        case .loading: return "Getting ready (first launch downloads the speech model)…"
-        case .ready: return "Ready"
+        case .loading: return "Getting ready…"
+        case .ready: return "Hold \(hotkey.trigger.title) to speak"
         case .recording: return "Listening…"
         case .transcribing: return "Transcribing…"
-        case .failed(let message): return "Problem: \(message)"
+        case .failed: return "Couldn't load the speech model"
         }
     }
 
@@ -223,13 +219,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
         item.target = self
         return item
-    }
-
-    private func permissionItem(allowed: Bool, name: String, action: Selector) -> NSMenuItem {
-        if allowed {
-            return disabledItem("✓ \(name) allowed")
-        }
-        return actionItem("Allow \(name)…", action)
     }
 
     @objc private func chooseTrigger(_ sender: NSMenuItem) {

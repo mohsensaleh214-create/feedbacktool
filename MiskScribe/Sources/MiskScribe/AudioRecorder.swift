@@ -20,10 +20,19 @@ final class AudioRecorder {
     )!
     private var converter: AVAudioConverter?
     private var samples: [Float] = []
+    private var level: Float = 0
     private let lock = NSLock()
 
+    /// How loud the microphone is right now, from 0 (silent) to 1 (loud).
+    var currentLevel: Float {
+        lock.withLock { level }
+    }
+
     func start() throws {
-        lock.withLock { samples.removeAll(keepingCapacity: true) }
+        lock.withLock {
+            samples.removeAll(keepingCapacity: true)
+            level = 0
+        }
 
         let input = engine.inputNode
         let inputFormat = input.outputFormat(forBus: 0)
@@ -78,6 +87,18 @@ final class AudioRecorder {
         guard status != .error, let channel = output.floatChannelData?[0] else { return }
 
         let chunk = Array(UnsafeBufferPointer(start: channel, count: Int(output.frameLength)))
-        lock.withLock { samples.append(contentsOf: chunk) }
+        let newLevel = Self.loudness(of: chunk)
+        lock.withLock {
+            samples.append(contentsOf: chunk)
+            level = newLevel
+        }
+    }
+
+    /// Converts the chunk's average volume to a 0…1 scale (-50 dB … -10 dB).
+    private static func loudness(of chunk: [Float]) -> Float {
+        guard !chunk.isEmpty else { return 0 }
+        let meanSquare = chunk.reduce(Float(0)) { $0 + $1 * $1 } / Float(chunk.count)
+        let decibels = 10 * log10(max(meanSquare, 1e-10))
+        return min(max((decibels + 50) / 40, 0), 1)
     }
 }
